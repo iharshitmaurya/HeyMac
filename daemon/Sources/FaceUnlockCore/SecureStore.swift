@@ -30,8 +30,22 @@ public final class SecureStore {
             throw SecureStoreError.encryptionFailed
         }
         let url = directory.appendingPathComponent(name)
-        try combined.write(to: url, options: [.atomic])
-        try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
+        // Write to a sibling temp file created with 0600 from the start, then
+        // atomically rename it into place — this avoids a window where the
+        // encrypted credential file exists at the process's default umask
+        // permissions before being locked down.
+        let tempURL = directory.appendingPathComponent(".\(name).tmp-\(UUID().uuidString)")
+        guard FileManager.default.createFile(
+            atPath: tempURL.path, contents: combined, attributes: [.posixPermissions: 0o600]
+        ) else {
+            throw SecureStoreError.encryptionFailed
+        }
+        do {
+            _ = try FileManager.default.replaceItemAt(url, withItemAt: tempURL)
+        } catch {
+            try? FileManager.default.removeItem(at: tempURL)
+            throw SecureStoreError.encryptionFailed
+        }
     }
 
     public func load(_ name: String) throws -> Data {
