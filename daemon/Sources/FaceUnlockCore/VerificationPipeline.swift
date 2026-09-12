@@ -9,6 +9,10 @@ public protocol LivenessChecking {
     func classify(_ image: CGImage) throws -> LivenessResult
 }
 
+public enum VerificationPipelineError: Error, Equatable {
+    case noImagesProvided
+}
+
 public struct PipelineConfig {
     public let matchThreshold: Float
     public init(matchThreshold: Float = 0.42) {
@@ -31,6 +35,7 @@ public final class VerificationPipeline {
     }
 
     public func enroll(images: [CGImage]) throws {
+        guard !images.isEmpty else { throw VerificationPipelineError.noImagesProvided }
         var embeddings: [FaceEmbedding] = []
         for image in images {
             embeddings.append(try embedder.embedding(in: image))

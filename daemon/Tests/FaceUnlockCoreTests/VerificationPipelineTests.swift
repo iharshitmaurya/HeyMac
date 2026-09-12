@@ -74,6 +74,13 @@ func makePipeline(embedder: FakeEmbedder, classifier: FakeClassifier) -> Verific
     }
 }
 
+@Test func enrollWithEmptyImagesThrowsCleanly() throws {
+    let pipeline = makePipeline(embedder: FakeEmbedder(), classifier: FakeClassifier())
+    #expect(throws: VerificationPipelineError.noImagesProvided) {
+        try pipeline.enroll(images: [])
+    }
+}
+
 @Test func enrollWithNoFaceDetectedPropagatesError() throws {
     let embedder = FakeEmbedder()
     embedder.shouldThrow = .noFaceDetected
