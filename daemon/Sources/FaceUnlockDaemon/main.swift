@@ -21,10 +21,13 @@ import FaceUnlockCore
 let supportDir = FileManager.default.homeDirectoryForCurrentUser
     .appendingPathComponent("Library/Application Support/faceunlock", isDirectory: true)
 try? FileManager.default.createDirectory(at: supportDir, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
+// createDirectory(attributes:) is a no-op if the directory already existed (e.g. created
+// by the install script's `mkdir -p` at the default umask), so enforce 0700 explicitly.
+try? FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: supportDir.path)
 
 let socketPath = supportDir.appendingPathComponent("faceunlock.sock").path
 
-let keyProvider = KeychainKeyProvider(account: NSUserName())
+let keyProvider = CachingKeyProvider(wrapping: KeychainKeyProvider(account: NSUserName()))
 let store = SecureStore(keyProvider: keyProvider, directory: supportDir)
 
 guard let embedder = try? FaceEmbedder(), let classifier = try? AntiSpoofClassifier() else {
@@ -45,8 +48,12 @@ if args.count > 1 && args[1] == "enroll" {
         if captured.count == 5 { semaphore.signal() }
     })
     try camera.start()
-    semaphore.wait()
+    let waitResult = semaphore.wait(timeout: .now() + 15)
     camera.stop()
+    guard waitResult == .success else {
+        print("Couldn't capture enough frames within 15 seconds — check Camera permission in System Settings and that no other app is using the camera.")
+        exit(1)
+    }
 
     do {
         try pipeline.enroll(images: captured)

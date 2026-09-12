@@ -53,3 +53,27 @@ func makeTempDirectory() -> URL {
 @Test func keychainKeyProviderIsConstructible() {
     _ = KeychainKeyProvider(account: "test-account-\(UUID().uuidString)")
 }
+
+// MARK: - Finding 2: CachingKeyProvider must call the wrapped provider at most once
+
+final class CountingKeyProvider: SymmetricKeyProviding {
+    private(set) var callCount = 0
+    let key = SymmetricKey(size: .bits256)
+    func fetchOrCreateKey() throws -> SymmetricKey {
+        callCount += 1
+        return key
+    }
+}
+
+@Test func cachingKeyProviderCallsWrappedProviderAtMostOnce() throws {
+    let inner = CountingKeyProvider()
+    let caching = CachingKeyProvider(wrapping: inner)
+
+    let first = try caching.fetchOrCreateKey()
+    let second = try caching.fetchOrCreateKey()
+    let third = try caching.fetchOrCreateKey()
+
+    #expect(inner.callCount == 1)
+    #expect(first == second)
+    #expect(second == third)
+}
