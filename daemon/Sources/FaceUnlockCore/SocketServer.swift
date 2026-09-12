@@ -9,9 +9,10 @@ public enum SocketServerError: Error, Equatable {
     case listenFailed
 }
 
-public final class SocketServer {
+public final class SocketServer: @unchecked Sendable {
     private let path: String
     private let handler: (WireMessage) -> WireMessage
+    private let stateLock = NSLock()
     private var listenFD: Int32 = -1
     private var running = false
     private let queue = DispatchQueue(label: "faceunlock.socketserver")
@@ -25,7 +26,7 @@ public final class SocketServer {
         unlink(path)
         let fd = socket(AF_UNIX, SOCK_STREAM, 0)
         guard fd >= 0 else { throw SocketServerError.socketCreationFailed }
-        listenFD = fd
+        stateLock.withLock { listenFD = fd }
 
         var addr = sockaddr_un()
         addr.sun_family = sa_family_t(AF_UNIX)
@@ -44,14 +45,20 @@ public final class SocketServer {
         chmod(path, 0o600)
         guard listen(fd, 8) == 0 else { throw SocketServerError.listenFailed }
 
-        running = true
+        stateLock.withLock { running = true }
         queue.async { [weak self] in self?.acceptLoop() }
     }
 
     private func acceptLoop() {
-        while running {
-            let clientFD = accept(listenFD, nil, nil)
-            guard clientFD >= 0 else { continue }
+        while stateLock.withLock({ running }) {
+            let fd = stateLock.withLock { listenFD }
+            let clientFD = accept(fd, nil, nil)
+            guard clientFD >= 0 else {
+                guard stateLock.withLock({ running }) else { break }
+                // ponytail: brief sleep instead of a tight spin on repeated accept() failures
+                usleep(10_000)
+                continue
+            }
             handle(clientFD)
         }
     }
@@ -66,10 +73,13 @@ public final class SocketServer {
     }
 
     public func stop() {
-        running = false
-        if listenFD >= 0 {
-            close(listenFD)
-            listenFD = -1
+        stateLock.withLock {
+            running = false
+            if listenFD >= 0 {
+                shutdown(listenFD, SHUT_RDWR)
+                close(listenFD)
+                listenFD = -1
+            }
         }
         unlink(path)
     }
