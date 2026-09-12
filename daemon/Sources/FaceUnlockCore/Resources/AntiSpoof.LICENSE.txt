@@ -1,0 +1,9 @@
+AntiSpoof.mlpackage — converted from minivision-ai/Silent-Face-Anti-Spoofing
+(https://github.com/minivision-ai/Silent-Face-Anti-Spoofing)
+License: Apache License 2.0
+Source weights: resources/anti_spoof_models/2.7_80x80_MiniFASNetV2.pth
+Converted 2026-09-12 via PyTorch -> torch.jit.trace -> coremltools (mlprogram),
+with a softmax wrapper appended so the Core ML model outputs class
+probabilities directly. Class index 1 = live face; indices 0 and 2 = spoof
+(print-attack / replay-attack respectively), per the upstream project's own
+test.py convention.
