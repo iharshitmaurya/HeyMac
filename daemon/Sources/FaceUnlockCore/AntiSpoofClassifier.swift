@@ -13,7 +13,7 @@ public struct LivenessResult: Equatable {
     public let confidence: Float
 }
 
-public final class AntiSpoofClassifier {
+public final class AntiSpoofClassifier: LivenessChecking {
     private let model: MLModel
     private let inputName = "input_image"
     private let outputName = "probabilities"

@@ -10,7 +10,7 @@ public enum FaceEmbedderError: Error, Equatable {
     case inferenceFailed
 }
 
-public final class FaceEmbedder {
+public final class FaceEmbedder: FaceEmbedding_Provider {
     private let model: MLModel
     private let inputName = "input_image"
     private let outputName = "embedding"
