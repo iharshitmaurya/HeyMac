@@ -59,8 +59,18 @@ public final class SocketServer: @unchecked Sendable {
                 usleep(10_000)
                 continue
             }
+            Self.setTimeout(on: clientFD, seconds: 5)
             handle(clientFD)
         }
+    }
+
+    /// Bounds how long a single accepted connection can block the (single-threaded)
+    /// accept loop on read/write, so a client that connects and never writes can't wedge
+    /// the daemon forever. 5s is inside VERIFY_LOCK's 6s budget and generous for VERIFY.
+    private static func setTimeout(on fd: Int32, seconds: Int) {
+        var tv = timeval(tv_sec: seconds, tv_usec: 0)
+        setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, socklen_t(MemoryLayout<timeval>.size))
+        setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &tv, socklen_t(MemoryLayout<timeval>.size))
     }
 
     private func handle(_ fd: Int32) {
