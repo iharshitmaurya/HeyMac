@@ -19,7 +19,7 @@ int send_and_wait(const char *socket_path, const char *request, int timeout_ms) 
         return 0;
     }
 
-    write(fd, request, strlen(request));
+    send(fd, request, strlen(request), MSG_NOSIGNAL);
 
     struct pollfd pfd = { .fd = fd, .events = POLLIN };
     int ready = poll(&pfd, 1, timeout_ms);
