@@ -2,3 +2,4 @@
 *.xcuserstate
 .worktrees/
 .superpowers/
+pam/*.so
