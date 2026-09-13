@@ -65,6 +65,26 @@ if args.count > 1 && args[1] == "enroll" {
     exit(0)
 }
 
+if args.count > 1 && args[1] == "set-password" {
+    guard let passwordCString = getpass("Enter your macOS login password (used only to type it in for you at the lock screen; never displayed or logged): ") else {
+        print("Failed to read password.")
+        exit(1)
+    }
+    let password = String(cString: passwordCString)
+    guard !password.isEmpty else {
+        print("Password cannot be empty.")
+        exit(1)
+    }
+    do {
+        try store.save(Data(password.utf8), as: "login-password")
+        print("Password saved.")
+    } catch {
+        print("Failed to save password: \(error)")
+        exit(1)
+    }
+    exit(0)
+}
+
 // Daemon mode: hold the most recent camera frame, answer VERIFY/VERIFY_LOCK over the socket.
 final class LatestFrameHolder {
     private let lock = NSLock()
@@ -92,6 +112,33 @@ let server = SocketServer(path: socketPath, handler: { message in
     }
 })
 try server.start()
+
+struct LockStateAdapter: LockStateChecking {
+    func isLocked() -> Bool? { isScreenLocked() }
+}
+
+let keystrokeInjector = KeystrokeInjector()
+let screensaverWatcher = ScreensaverWatcher(
+    lockChecker: LockStateAdapter(),
+    typist: keystrokeInjector,
+    wakeDisplay: {
+        let task = Process()
+        task.executableURL = URL(fileURLWithPath: "/usr/bin/caffeinate")
+        task.arguments = ["-u", "-t", "1"]
+        try? task.run()
+        task.waitUntilExit()
+    }
+)
+
+let screensaverTimer = Timer(timeInterval: 2.0, repeats: true) { _ in
+    guard isScreenLocked() == true else { return }
+    guard let frame = frameHolder.current() else { return }
+    guard let matched = try? pipeline.verify(image: frame), matched else { return }
+    guard let passwordData = try? store.load("login-password"),
+          let password = String(data: passwordData, encoding: .utf8) else { return }
+    try? screensaverWatcher.attemptUnlock(password: password)
+}
+RunLoop.main.add(screensaverTimer, forMode: .common)
 
 print("faceunlockd running, socket at \(socketPath)")
 RunLoop.main.run()
