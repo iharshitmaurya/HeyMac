@@ -30,13 +30,69 @@ let socketPath = supportDir.appendingPathComponent("faceunlock.sock").path
 let keyProvider = CachingKeyProvider(wrapping: KeychainKeyProvider(account: NSUserName()))
 let store = SecureStore(keyProvider: keyProvider, directory: supportDir)
 
+let args = CommandLine.arguments
+
+// set-password and clear-password only touch `store` — keep them ahead of the
+// (slow, model-resource-dependent) model loading below so they never pay that cost
+// and never fail just because the model bundle happens to be missing.
+if args.count > 1 && args[1] == "set-password" {
+    guard let passwordCString = getpass("Enter your macOS login password (used only to type it in for you at the lock screen; never displayed or logged): ") else {
+        print("Failed to read password.")
+        exit(1)
+    }
+    let password = String(cString: passwordCString)
+    guard !password.isEmpty else {
+        print("Password cannot be empty.")
+        exit(1)
+    }
+    guard let confirmCString = getpass("Confirm password: ") else {
+        print("Failed to read password.")
+        exit(1)
+    }
+    let confirmation = String(cString: confirmCString)
+    guard password == confirmation else {
+        print("Passwords did not match. Nothing was saved.")
+        exit(1)
+    }
+    do {
+        try store.save(Data(password.utf8), as: "login-password")
+        print("Password saved.")
+    } catch {
+        print("Failed to save password: \(error)")
+        exit(1)
+    }
+    exit(0)
+}
+
+if args.count > 1 && args[1] == "clear-password" {
+    let url = supportDir.appendingPathComponent("login-password")
+    guard FileManager.default.fileExists(atPath: url.path) else {
+        print("No stored password found.")
+        exit(0)
+    }
+    do {
+        try FileManager.default.removeItem(at: url)
+        print("Stored password removed.")
+    } catch {
+        print("Failed to remove stored password: \(error)")
+        exit(1)
+    }
+    exit(0)
+}
+
+// Everything below this point (enroll, and daemon mode) needs the ML models.
 guard let embedder = try? FaceEmbedder(), let classifier = try? AntiSpoofClassifier() else {
     FileHandle.standardError.write(Data("faceunlockd: failed to load models\n".utf8))
     exit(1)
 }
 let pipeline = VerificationPipeline(embedder: embedder, classifier: classifier, store: store)
 
-let args = CommandLine.arguments
+// Warm the Touch-ID-gated key cache once now, while we're definitely running
+// interactively with the session unlocked (a fresh `launchctl kickstart` or enroll
+// run) — never during a lock episode, where a background LaunchAgent has no way to
+// present a Touch ID prompt. CachingKeyProvider then reuses this cached key for every
+// later call, including ones made from the screensaver tick while the screen is locked.
+_ = try? keyProvider.fetchOrCreateKey()
 
 if args.count > 1 && args[1] == "enroll" {
     print("Look at the camera. Capturing 5 frames over the next few seconds...")
@@ -65,35 +121,28 @@ if args.count > 1 && args[1] == "enroll" {
     exit(0)
 }
 
-if args.count > 1 && args[1] == "set-password" {
-    guard let passwordCString = getpass("Enter your macOS login password (used only to type it in for you at the lock screen; never displayed or logged): ") else {
-        print("Failed to read password.")
-        exit(1)
-    }
-    let password = String(cString: passwordCString)
-    guard !password.isEmpty else {
-        print("Password cannot be empty.")
-        exit(1)
-    }
-    do {
-        try store.save(Data(password.utf8), as: "login-password")
-        print("Password saved.")
-    } catch {
-        print("Failed to save password: \(error)")
-        exit(1)
-    }
-    exit(0)
-}
-
 // Daemon mode: hold the most recent camera frame, answer VERIFY/VERIFY_LOCK over the socket.
 final class LatestFrameHolder {
     private let lock = NSLock()
-    private var frame: CGImage?
-    func update(_ image: CGImage) {
-        lock.lock(); frame = image; lock.unlock()
+    private var frame: (image: CGImage, capturedAt: Date)?
+    private let maxAge: TimeInterval
+
+    init(maxAge: TimeInterval = 2.0) {
+        self.maxAge = maxAge
     }
+
+    func update(_ image: CGImage) {
+        lock.lock(); frame = (image, Date()); lock.unlock()
+    }
+
+    /// Returns the latest frame only if it's still fresh (captured within `maxAge`).
+    /// A stale or missing frame (e.g. the camera stopped delivering frames because the
+    /// display slept or the app lost camera access) is treated as "no frame" — callers
+    /// must never act on a frame that could predate the person actually being present.
     func current() -> CGImage? {
-        lock.lock(); defer { lock.unlock() }; return frame
+        lock.lock(); defer { lock.unlock() }
+        guard let frame, Date().timeIntervalSince(frame.capturedAt) <= maxAge else { return nil }
+        return frame.image
     }
 }
 
@@ -130,12 +179,27 @@ let screensaverWatcher = ScreensaverWatcher(
     }
 )
 
+// One-shot latch bounding unlock attempts to at most one per lock episode: reset when
+// the screen transitions back to unlocked (the natural episode boundary), and set right
+// before the one attempt this episode gets. This prevents unbounded retries against a
+// wrong/stale stored password, and prevents synthetic keystrokes from ever interleaving
+// with the legitimate user's own manual password entry after the first attempt.
+var hasAttemptedThisLockEpisode = false
+
 let screensaverTimer = Timer(timeInterval: 2.0, repeats: true) { _ in
-    guard isScreenLocked() == true else { return }
-    guard let frame = frameHolder.current() else { return }
-    guard let matched = try? pipeline.verify(image: frame), matched else { return }
+    guard isScreenLocked() == true else {
+        hasAttemptedThisLockEpisode = false
+        return
+    }
+    guard !hasAttemptedThisLockEpisode else { return }
+    // Check for a stored password before running any ML inference — cheap guard first,
+    // so a screen that's locked with no password ever configured doesn't burn CPU on
+    // face-embedding + liveness inference every 2 seconds for nothing.
     guard let passwordData = try? store.load("login-password"),
           let password = String(data: passwordData, encoding: .utf8) else { return }
+    guard let frame = frameHolder.current() else { return }
+    guard let matched = try? pipeline.verify(image: frame), matched else { return }
+    hasAttemptedThisLockEpisode = true
     try? screensaverWatcher.attemptUnlock(password: password)
 }
 RunLoop.main.add(screensaverTimer, forMode: .common)
