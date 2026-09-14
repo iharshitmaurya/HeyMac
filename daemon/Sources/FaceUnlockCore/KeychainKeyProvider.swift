@@ -24,6 +24,7 @@ public final class KeychainKeyProvider: SymmetricKeyProviding {
     }
 
     public func fetchOrCreateKey() throws -> SymmetricKey {
+        try authenticate()
         if let existing = try readKey() {
             return existing
         }
@@ -35,40 +36,59 @@ public final class KeychainKeyProvider: SymmetricKeyProviding {
         return readBack
     }
 
-    private func readKey() throws -> SymmetricKey? {
+    // Biometric gating is done explicitly here rather than via SecAccessControl's
+    // .userPresence flag: that flag requires a keychain-access-groups entitlement
+    // tied to a real Team ID, which an ad-hoc-signed CLI binary (no paid/free Apple
+    // Developer identity) cannot obtain — it fails every access with
+    // errSecMissingEntitlement (-34018) regardless of code signing. Evaluating the
+    // policy ourselves gives the same "must prove device ownership" property without
+    // requiring any entitlement.
+    private func authenticate() throws {
         let context = LAContext()
-        context.localizedReason = "Unlock your face-unlock credentials"
+        var evalError: NSError?
+        guard context.canEvaluatePolicy(.deviceOwnerAuthentication, error: &evalError) else {
+            throw SecureStoreError.encryptionFailed
+        }
+        let semaphore = DispatchSemaphore(value: 0)
+        var success = false
+        context.evaluatePolicy(.deviceOwnerAuthentication, localizedReason: "Unlock your face-unlock credentials") { result, _ in
+            success = result
+            semaphore.signal()
+        }
+        semaphore.wait()
+        guard success else {
+            throw SecureStoreError.encryptionFailed
+        }
+    }
+
+    private func readKey() throws -> SymmetricKey? {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
             kSecAttrAccount as String: account,
             kSecReturnData as String: true,
-            kSecUseAuthenticationContext as String: context,
         ]
         var result: AnyObject?
         let status = SecItemCopyMatching(query as CFDictionary, &result)
         if status == errSecItemNotFound { return nil }
         guard status == errSecSuccess, let data = result as? Data else {
+            FileHandle.standardError.write(Data("readKey failed, OSStatus \(status): \(SecCopyErrorMessageString(status, nil) ?? "unknown" as CFString)\n".utf8))
             throw SecureStoreError.decryptionFailed
         }
         return SymmetricKey(data: data)
     }
 
     private func store(_ key: SymmetricKey) throws {
-        guard let access = SecAccessControlCreateWithFlags(
-            nil, kSecAttrAccessibleWhenUnlockedThisDeviceOnly, .userPresence, nil
-        ) else {
-            throw SecureStoreError.encryptionFailed
-        }
         let attributes: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
             kSecAttrAccount as String: account,
             kSecValueData as String: key.withUnsafeBytes { Data($0) },
-            kSecAttrAccessControl as String: access,
+            kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlockedThisDeviceOnly,
         ]
         let status = SecItemAdd(attributes as CFDictionary, nil)
         guard status == errSecSuccess else {
+            FileHandle.standardError.write(Data("store failed, OSStatus \(status): \(SecCopyErrorMessageString(status, nil) ?? "unknown" as CFString)\n".utf8))
             throw SecureStoreError.encryptionFailed
         }
     }

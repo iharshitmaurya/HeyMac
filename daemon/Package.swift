@@ -18,7 +18,18 @@ let package = Package(
                 .copy("Resources/AntiSpoof.LICENSE.txt"),
             ]
         ),
-        .executableTarget(name: "FaceUnlockDaemon", dependencies: ["FaceUnlockCore"]),
+        .executableTarget(
+            name: "FaceUnlockDaemon",
+            dependencies: ["FaceUnlockCore"],
+            linkerSettings: [
+                .unsafeFlags([
+                    "-Xlinker", "-sectcreate",
+                    "-Xlinker", "__TEXT",
+                    "-Xlinker", "__info_plist",
+                    "-Xlinker", "Sources/FaceUnlockDaemon/Info.plist",
+                ])
+            ]
+        ),
         .testTarget(name: "FaceUnlockCoreTests", dependencies: ["FaceUnlockCore"]),
     ]
 )
