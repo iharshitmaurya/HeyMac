@@ -6,11 +6,18 @@ import CoreGraphics
     _ = try AntiSpoofClassifier()
 }
 
-@Test func flatColorImageClassifiesAsNotLive() throws {
-    // Verified during planning: a flat gray 80x80 input yields a confident non-live
-    // classification from this model (spoof classes dominate for a textureless input).
+@Test func flatGrayPatchIsNotLive() throws {
     let classifier = try AntiSpoofClassifier()
-    let flatImage = makeSolidColorImage(width: 80, height: 80, gray: 0.5)
-    let result = try classifier.classify(flatImage)
-    #expect(result.isLive == false)
+    let patch = RGBAImage(width: 80, height: 80, bytes: [UInt8](repeating: 128, count: 80 * 80 * 4))
+    #expect(try classifier.classify(patch: patch).isLive == false)
+}
+
+@Test func modelOutputDependsOnInput() throws {
+    // The 2026-09-12 conversion returned the same distribution for every input; this
+    // catches that failure mode directly.
+    let classifier = try AntiSpoofClassifier()
+    let dark = try classifier.probabilities(for: RGBAImage(width: 80, height: 80, bytes: [UInt8](repeating: 10, count: 80 * 80 * 4)))
+    let bright = try classifier.probabilities(for: RGBAImage(width: 80, height: 80, bytes: [UInt8](repeating: 240, count: 80 * 80 * 4)))
+    let delta = zip(dark, bright).map { abs($0 - $1) }.max() ?? 0
+    #expect(delta > 0.01)
 }

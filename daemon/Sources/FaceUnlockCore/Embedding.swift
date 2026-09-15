@@ -22,6 +22,12 @@ public enum EmbeddingMath {
         return dot / (normA.squareRoot() * normB.squareRoot())
     }
 
+    public static func normalized(_ embedding: FaceEmbedding) -> FaceEmbedding {
+        let norm = embedding.vector.reduce(0) { $0 + $1 * $1 }.squareRoot()
+        guard norm > 0 else { return embedding }
+        return FaceEmbedding(vector: embedding.vector.map { $0 / norm })
+    }
+
     public static func centroid(of embeddings: [FaceEmbedding]) -> FaceEmbedding {
         precondition(!embeddings.isEmpty, "centroid requires at least one embedding")
         let dimension = embeddings[0].vector.count

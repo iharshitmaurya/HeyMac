@@ -1,11 +1,9 @@
 import Foundation
 import CryptoKit
 
-/// Wraps another `SymmetricKeyProviding` and caches the first successful result in
-/// memory, so the wrapped provider (e.g. `KeychainKeyProvider`, which may prompt Touch
-/// ID via a `.userPresence`-gated Keychain item) is consulted at most once per process
-/// lifetime. Thread-safe: `SecureStore`/`VerificationPipeline` may be invoked from the
-/// socket server's per-connection handling.
+/// Caches the first successful key fetch in memory so the Keychain is consulted once per
+/// process. Failures are not cached, so access granted later (e.g. "Always Allow" clicked
+/// from a CLI run) is picked up by a running daemon. Thread-safe.
 public final class CachingKeyProvider: SymmetricKeyProviding {
     private let wrapped: SymmetricKeyProviding
     private let lock = NSLock()

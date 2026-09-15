@@ -1,7 +1,5 @@
-import Vision
+import CoreGraphics
 import CoreML
-import CoreImage
-import CoreVideo
 import Foundation
 
 public enum FaceEmbedderError: Error, Equatable {
@@ -10,14 +8,20 @@ public enum FaceEmbedderError: Error, Equatable {
     case inferenceFailed
 }
 
+public protocol FaceEmbedding_Provider {
+    func embedding(for face: DetectedFace, in frame: RGBAImage) throws -> FaceEmbedding
+}
+
+/// ArcFace (w600k_mbf). The model's input spec is "112x112 RGB aligned face crop" with
+/// (x - 127.5) / 127.5 normalization baked in, so the only preprocessing owed here is the
+/// 5-landmark similarity alignment — without it the model compares framing, not identity.
 public final class FaceEmbedder: FaceEmbedding_Provider {
     private let model: MLModel
     private let inputName = "input_image"
     private let outputName = "embedding"
-    private let inputSize = (width: 112, height: 112)
 
     public init() throws {
-        guard let url = Bundle.module.url(forResource: "ArcFace", withExtension: "mlpkgdata") else {
+        guard let url = ModelResources.url(named: "ArcFace") else {
             throw FaceEmbedderError.modelLoadFailed
         }
         do {
@@ -28,19 +32,11 @@ public final class FaceEmbedder: FaceEmbedding_Provider {
         }
     }
 
-    public func embedding(in image: CGImage) throws -> FaceEmbedding {
-        let handler = VNImageRequestHandler(cgImage: image, options: [:])
-        let request = VNDetectFaceRectanglesRequest()
-        try? handler.perform([request])
-        guard let face = request.results?.first else {
-            throw FaceEmbedderError.noFaceDetected
-        }
-        let pixelBuffer = try Self.alignedPixelBuffer(from: image, boundingBox: face.boundingBox, targetSize: inputSize)
-        return try infer(on: pixelBuffer)
-    }
-
-    private func infer(on pixelBuffer: CVPixelBuffer) throws -> FaceEmbedding {
-        guard let provider = try? MLDictionaryFeatureProvider(dictionary: [inputName: MLFeatureValue(pixelBuffer: pixelBuffer)]),
+    public func embedding(for face: DetectedFace, in frame: RGBAImage) throws -> FaceEmbedding {
+        guard face.landmarks.count == 5 else { throw FaceEmbedderError.noFaceDetected }
+        let aligned = FaceGeometry.alignedFace(in: frame, landmarks: face.landmarks)
+        guard let pixelBuffer = aligned.makePixelBuffer(),
+              let provider = try? MLDictionaryFeatureProvider(dictionary: [inputName: MLFeatureValue(pixelBuffer: pixelBuffer)]),
               let output = try? model.prediction(from: provider),
               let multiArray = output.featureValue(for: outputName)?.multiArrayValue
         else {
@@ -48,44 +44,13 @@ public final class FaceEmbedder: FaceEmbedding_Provider {
         }
         var vector = [Float](repeating: 0, count: multiArray.count)
         for i in 0..<multiArray.count { vector[i] = multiArray[i].floatValue }
-        return FaceEmbedding(vector: vector)
+        return EmbeddingMath.normalized(FaceEmbedding(vector: vector))
     }
 
-    private static func alignedPixelBuffer(from image: CGImage, boundingBox: CGRect, targetSize: (width: Int, height: Int)) throws -> CVPixelBuffer {
-        let imageWidth = CGFloat(image.width)
-        let imageHeight = CGFloat(image.height)
-        // Vision's normalized boundingBox has its origin at the bottom-left; CGImage's is top-left.
-        let rect = CGRect(
-            x: boundingBox.origin.x * imageWidth,
-            y: (1 - boundingBox.origin.y - boundingBox.height) * imageHeight,
-            width: boundingBox.width * imageWidth,
-            height: boundingBox.height * imageHeight
-        ).integral
-
-        guard rect.width > 0, rect.height > 0, let cropped = image.cropping(to: rect) else {
-            throw FaceEmbedderError.noFaceDetected
-        }
-
-        var pixelBuffer: CVPixelBuffer?
-        let attrs: [CFString: Any] = [
-            kCVPixelBufferCGImageCompatibilityKey: true,
-            kCVPixelBufferCGBitmapContextCompatibilityKey: true,
-        ]
-        CVPixelBufferCreate(kCFAllocatorDefault, targetSize.width, targetSize.height, kCVPixelFormatType_32ARGB, attrs as CFDictionary, &pixelBuffer)
-        guard let buffer = pixelBuffer else { throw FaceEmbedderError.inferenceFailed }
-
-        CVPixelBufferLockBaseAddress(buffer, [])
-        defer { CVPixelBufferUnlockBaseAddress(buffer, []) }
-        guard let context = CGContext(
-            data: CVPixelBufferGetBaseAddress(buffer),
-            width: targetSize.width, height: targetSize.height,
-            bitsPerComponent: 8, bytesPerRow: CVPixelBufferGetBytesPerRow(buffer),
-            space: CGColorSpaceCreateDeviceRGB(),
-            bitmapInfo: CGImageAlphaInfo.noneSkipFirst.rawValue
-        ) else {
-            throw FaceEmbedderError.inferenceFailed
-        }
-        context.draw(cropped, in: CGRect(x: 0, y: 0, width: targetSize.width, height: targetSize.height))
-        return buffer
+    /// Detect-then-embed convenience for callers holding just a frame.
+    public func embedding(in image: CGImage, detector: FaceDetecting = VisionFaceDetector()) throws -> FaceEmbedding {
+        let face = try detector.detectLargestFace(in: image)
+        guard let frame = RGBAImage(cgImage: image) else { throw FaceEmbedderError.inferenceFailed }
+        return try embedding(for: face, in: frame)
     }
 }

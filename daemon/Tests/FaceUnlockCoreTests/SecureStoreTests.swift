@@ -50,8 +50,13 @@ func makeTempDirectory() -> URL {
     #expect(permissions.intValue == 0o600)
 }
 
-@Test func keychainKeyProviderIsConstructible() {
-    _ = KeychainKeyProvider(account: "test-account-\(UUID().uuidString)")
+@Test func nonInteractiveKeychainProviderNeverCreatesAKey() {
+    // The daemon must fail fast when no key exists rather than mint one, which would
+    // orphan the existing encrypted enrollment.
+    let provider = KeychainKeyProvider(account: "faceunlock-test-\(UUID().uuidString)", interactive: false)
+    #expect(throws: KeychainKeyProviderError.notFound) {
+        _ = try provider.fetchOrCreateKey()
+    }
 }
 
 // MARK: - Finding 2: CachingKeyProvider must call the wrapped provider at most once

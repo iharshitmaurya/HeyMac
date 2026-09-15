@@ -1,95 +1,74 @@
-import Foundation
 import CryptoKit
+import Foundation
 import Security
-import LocalAuthentication
 
-// Manual verification (not automatable — requires real Touch ID hardware and a
-// signed app context with Keychain access):
-//   1. Build the daemon executable, run it once, call fetchOrCreateKey() — expect
-//      a Touch ID prompt, then a key returned.
-//   2. Call fetchOrCreateKey() again in the same run — expect no prompt (cached
-//      by whatever caller holds the key in memory; KeychainKeyProvider itself
-//      re-reads the Keychain each call, which itself may re-prompt depending on
-//      SecAccessControl's context reuse — note actual behavior here once observed).
-//   3. Kill and restart the daemon, call fetchOrCreateKey() — expect a fresh
-//      Touch ID prompt (no in-memory cache survives a process restart).
-//   4. Cancel the Touch ID prompt — expect fetchOrCreateKey() to throw, never to
-//      return a key or hang.
+public enum KeychainKeyProviderError: Error, Equatable {
+    /// The item exists but reading it needs user approval (typically the Keychain
+    /// "allow access" dialog after the binary was rebuilt and its code signature changed).
+    case interactionRequired(OSStatus)
+    case notFound
+    case readFailed(OSStatus)
+    case storeFailed(OSStatus)
+}
+
+/// Holds the AES key that encrypts the enrolled face and the stored login password, as a
+/// generic password in the login keychain. The keychain's per-app ACL keeps other apps
+/// from reading it silently.
+///
+/// `interactive: false` is for the background daemon: it never shows a dialog (a LaunchAgent
+/// blocked on an unseen prompt stops answering sudo and the lock screen) and never creates
+/// a key (a fresh key would silently orphan the existing encrypted enrollment). Interactive
+/// CLI commands (enroll, set-password, verify) may prompt; choosing "Always Allow" there
+/// authorizes this binary for the daemon too, since both run the same executable.
 public final class KeychainKeyProvider: SymmetricKeyProviding {
     private let account: String
+    private let interactive: Bool
     private let service = "com.faceunlock.sessionkey"
 
-    public init(account: String) {
+    public init(account: String, interactive: Bool) {
         self.account = account
+        self.interactive = interactive
     }
 
     public func fetchOrCreateKey() throws -> SymmetricKey {
-        try authenticate()
-        if let existing = try readKey() {
-            return existing
-        }
-        let newKey = SymmetricKey(size: .bits256)
-        try store(newKey)
-        guard let readBack = try readKey() else {
-            throw SecureStoreError.encryptionFailed
-        }
-        return readBack
-    }
-
-    // Biometric gating is done explicitly here rather than via SecAccessControl's
-    // .userPresence flag: that flag requires a keychain-access-groups entitlement
-    // tied to a real Team ID, which an ad-hoc-signed CLI binary (no paid/free Apple
-    // Developer identity) cannot obtain — it fails every access with
-    // errSecMissingEntitlement (-34018) regardless of code signing. Evaluating the
-    // policy ourselves gives the same "must prove device ownership" property without
-    // requiring any entitlement.
-    private func authenticate() throws {
-        let context = LAContext()
-        var evalError: NSError?
-        guard context.canEvaluatePolicy(.deviceOwnerAuthentication, error: &evalError) else {
-            throw SecureStoreError.encryptionFailed
-        }
-        let semaphore = DispatchSemaphore(value: 0)
-        var success = false
-        context.evaluatePolicy(.deviceOwnerAuthentication, localizedReason: "Unlock your face-unlock credentials") { result, _ in
-            success = result
-            semaphore.signal()
-        }
-        semaphore.wait()
-        guard success else {
-            throw SecureStoreError.encryptionFailed
-        }
-    }
-
-    private func readKey() throws -> SymmetricKey? {
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
-            kSecAttrAccount as String: account,
-            kSecReturnData as String: true,
-        ]
-        var result: AnyObject?
-        let status = SecItemCopyMatching(query as CFDictionary, &result)
-        if status == errSecItemNotFound { return nil }
-        guard status == errSecSuccess, let data = result as? Data else {
-            FileHandle.standardError.write(Data("readKey failed, OSStatus \(status): \(SecCopyErrorMessageString(status, nil) ?? "unknown" as CFString)\n".utf8))
-            throw SecureStoreError.decryptionFailed
-        }
-        return SymmetricKey(data: data)
-    }
-
-    private func store(_ key: SymmetricKey) throws {
+        if let existing = try readKey() { return existing }
+        guard interactive else { throw KeychainKeyProviderError.notFound }
+        let key = SymmetricKey(size: .bits256)
         let attributes: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
             kSecAttrAccount as String: account,
+            kSecAttrLabel as String: "faceunlock encryption key",
             kSecValueData as String: key.withUnsafeBytes { Data($0) },
-            kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlockedThisDeviceOnly,
         ]
         let status = SecItemAdd(attributes as CFDictionary, nil)
-        guard status == errSecSuccess else {
-            FileHandle.standardError.write(Data("store failed, OSStatus \(status): \(SecCopyErrorMessageString(status, nil) ?? "unknown" as CFString)\n".utf8))
-            throw SecureStoreError.encryptionFailed
+        guard status == errSecSuccess else { throw KeychainKeyProviderError.storeFailed(status) }
+        return key
+    }
+
+    private func readKey() throws -> SymmetricKey? {
+        var query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: account,
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne,
+        ]
+        if !interactive {
+            query[kSecUseAuthenticationUI as String] = kSecUseAuthenticationUIFail
+        }
+        var result: AnyObject?
+        let status = SecItemCopyMatching(query as CFDictionary, &result)
+        switch status {
+        case errSecSuccess:
+            guard let data = result as? Data, data.count == 32 else { throw KeychainKeyProviderError.readFailed(status) }
+            return SymmetricKey(data: data)
+        case errSecItemNotFound:
+            return nil
+        case errSecInteractionNotAllowed, errSecAuthFailed, errSecUserCanceled:
+            throw KeychainKeyProviderError.interactionRequired(status)
+        default:
+            throw KeychainKeyProviderError.readFailed(status)
         }
     }
 }

@@ -1,0 +1,4 @@
+image_T1.jpg (real face), image_F1.jpg and image_F2.jpg (spoofs) are the sample
+images from minivision-ai/Silent-Face-Anti-Spoofing (images/sample/, commit
+b6d5f04ad78778917853b25c778acef6d5626d15), Apache License 2.0. Used unmodified as
+regression fixtures for the converted anti-spoof model.

@@ -21,6 +21,7 @@ let package = Package(
         .executableTarget(
             name: "FaceUnlockDaemon",
             dependencies: ["FaceUnlockCore"],
+            exclude: ["Info.plist"],
             linkerSettings: [
                 .unsafeFlags([
                     "-Xlinker", "-sectcreate",
@@ -30,6 +31,10 @@ let package = Package(
                 ])
             ]
         ),
-        .testTarget(name: "FaceUnlockCoreTests", dependencies: ["FaceUnlockCore"]),
+        .testTarget(
+            name: "FaceUnlockCoreTests",
+            dependencies: ["FaceUnlockCore"],
+            resources: [.copy("Fixtures")]
+        ),
     ]
 )

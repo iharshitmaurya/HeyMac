@@ -12,6 +12,8 @@ DAEMON_ROOT="$(dirname "$SCRIPT_DIR")"
 echo "Building faceunlockd (release)..."
 (cd "$DAEMON_ROOT" && swift build -c release)
 
+launchctl bootout "gui/$(id -u)/$LABEL" 2>/dev/null || true
+
 mkdir -p "$INSTALL_DIR"
 cp "$DAEMON_ROOT/.build/release/faceunlockd" "$INSTALL_DIR/faceunlockd"
 # SwiftPM emits a resource bundle beside the executable (holds the vendored .mlpkgdata
@@ -22,12 +24,21 @@ for bundle in "$DAEMON_ROOT"/.build/release/*.bundle; do
     rm -rf "$INSTALL_DIR/$(basename "$bundle")"
     cp -R "$bundle" "$INSTALL_DIR/"
 done
+# A stable identifier (matching the embedded Info.plist) for Camera/Accessibility prompts.
+codesign --force --sign - --identifier com.faceunlock.daemon "$INSTALL_DIR/faceunlockd"
 
 mkdir -p "$PLIST_DIR"
 sed "s|__INSTALL_PATH__|$INSTALL_DIR|g" "$SCRIPT_DIR/com.faceunlock.daemon.plist" > "$PLIST_PATH"
-
-launchctl bootout "gui/$(id -u)/$LABEL" 2>/dev/null || true
 launchctl bootstrap "gui/$(id -u)" "$PLIST_PATH"
 
-echo "Installed. Run '$INSTALL_DIR/faceunlockd enroll' to enroll your face."
-echo "Grant Camera access to faceunlockd when prompted on first run."
+BIN="$INSTALL_DIR/faceunlockd"
+cat <<EOF
+Installed and started. Daemon log: /tmp/faceunlockd.err
+
+Next steps (run in Terminal):
+  1. "$BIN" enroll          # allow Camera when asked; look at the camera
+  2. "$BIN" verify          # should print OK; shows per-frame scores
+  3. "$BIN" set-password    # only if you want lock-screen unlock
+  4. Lock-screen unlock also needs System Settings > Privacy & Security > Accessibility
+     to include: $BIN   (re-add it after every reinstall; the signature changes)
+EOF

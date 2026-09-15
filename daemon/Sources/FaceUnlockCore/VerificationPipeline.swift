@@ -1,121 +1,111 @@
-import Foundation
 import CoreGraphics
-import Vision
-
-public protocol FaceEmbedding_Provider {
-    func embedding(in image: CGImage) throws -> FaceEmbedding
-}
-
-public protocol LivenessChecking {
-    func classify(_ image: CGImage) throws -> LivenessResult
-}
-
-/// Detects and crops the face region from a frame, so the same face-region image (not
-/// the full, mostly-background frame) can be handed to both the embedder and the
-/// liveness classifier.
-public protocol FaceCropping {
-    func crop(_ image: CGImage) throws -> CGImage
-}
-
-/// Vision-based cropper, using the same face-detection approach `FaceEmbedder` uses
-/// internally. Returns a `CGImage` (rather than a `CVPixelBuffer`) since the crop needs
-/// to be handed to two different consumers (embedder, classifier).
-public struct VisionFaceCropper: FaceCropping {
-    public init() {}
-
-    public func crop(_ image: CGImage) throws -> CGImage {
-        let handler = VNImageRequestHandler(cgImage: image, options: [:])
-        let request = VNDetectFaceRectanglesRequest()
-        try? handler.perform([request])
-        guard let face = request.results?.first else {
-            throw FaceEmbedderError.noFaceDetected
-        }
-        let imageWidth = CGFloat(image.width)
-        let imageHeight = CGFloat(image.height)
-        // Vision's normalized boundingBox has its origin at the bottom-left; CGImage's is top-left.
-        let rect = CGRect(
-            x: face.boundingBox.origin.x * imageWidth,
-            y: (1 - face.boundingBox.origin.y - face.boundingBox.height) * imageHeight,
-            width: face.boundingBox.width * imageWidth,
-            height: face.boundingBox.height * imageHeight
-        ).integral
-        guard rect.width > 0, rect.height > 0, let cropped = image.cropping(to: rect) else {
-            throw FaceEmbedderError.noFaceDetected
-        }
-        return cropped
-    }
-}
+import Foundation
 
 public enum VerificationPipelineError: Error, Equatable {
     case noImagesProvided
+    case notLive(confidence: Float)
+    case corruptEnrollment
 }
 
 public struct PipelineConfig {
+    /// Cosine similarity between a frame's L2-normalized aligned ArcFace embedding and the
+    /// enrolled (normalized) centroid. Aligned w600k_mbf scores the same person well above
+    /// 0.5 and different people well below 0.3; ohmylock ships 0.62 for the same model.
     public let matchThreshold: Float
-    /// Minimum confidence the anti-spoof classifier must have in its "live" prediction,
-    /// on top of "live" actually being the argmax class. The spec requires "low
-    /// confidence" liveness to fail verification, not just a wrong top class. 0.7 is a
-    /// conservative floor given real observed outputs are decisive (e.g. [0.0003,
-    /// 0.0054, 0.9941] for a confident non-live read) — a "live" call anywhere near the
-    /// decision boundary should not be trusted.
+    /// Minimum anti-spoof probability for the live class, on top of live being the argmax.
+    /// Real webcam faces score ~0.99; upstream's print/replay samples score ≤0.002.
     public let livenessThreshold: Float
-    public init(matchThreshold: Float = 0.42, livenessThreshold: Float = 0.7) {
+
+    public init(matchThreshold: Float = 0.5, livenessThreshold: Float = 0.6) {
         self.matchThreshold = matchThreshold
         self.livenessThreshold = livenessThreshold
     }
 }
 
+public struct FrameEvaluation: Equatable, Sendable {
+    public let liveness: Float
+    public let similarity: Float
+    public let isLive: Bool
+    public let isMatch: Bool
+
+    public var accepted: Bool { isLive && isMatch }
+}
+
 public final class VerificationPipeline {
+    private let detector: FaceDetecting
     private let embedder: FaceEmbedding_Provider
     private let classifier: LivenessChecking
     private let store: SecureStore
-    private let config: PipelineConfig
-    private let cropper: FaceCropping
-    private let centroidKey = "face-centroid"
+    public let config: PipelineConfig
+    static let centroidKey = "face-centroid"
 
     public init(
-        embedder: FaceEmbedding_Provider, classifier: LivenessChecking, store: SecureStore,
-        config: PipelineConfig = PipelineConfig(), cropper: FaceCropping = VisionFaceCropper()
+        detector: FaceDetecting = VisionFaceDetector(), embedder: FaceEmbedding_Provider, classifier: LivenessChecking,
+        store: SecureStore, config: PipelineConfig = PipelineConfig()
     ) {
+        self.detector = detector
         self.embedder = embedder
         self.classifier = classifier
         self.store = store
         self.config = config
-        self.cropper = cropper
+    }
+
+    /// One enrollment sample: the frame must contain a face that passes liveness, so a
+    /// photo can't be enrolled.
+    public func enrollmentSample(from image: CGImage) throws -> (embedding: FaceEmbedding, liveness: LivenessResult) {
+        let (face, frame) = try detect(in: image)
+        let liveness = try classifier.liveness(for: face, in: frame)
+        guard isLive(liveness) else { throw VerificationPipelineError.notLive(confidence: liveness.confidence) }
+        return (try embedder.embedding(for: face, in: frame), liveness)
+    }
+
+    /// Saves the normalized centroid of `embeddings` as the enrolled identity.
+    @discardableResult
+    public func saveEnrollment(_ embeddings: [FaceEmbedding]) throws -> FaceEmbedding {
+        guard !embeddings.isEmpty else { throw VerificationPipelineError.noImagesProvided }
+        let centroid = EmbeddingMath.normalized(EmbeddingMath.centroid(of: embeddings.map(EmbeddingMath.normalized)))
+        let data = centroid.vector.withUnsafeBufferPointer { Data(buffer: $0) }
+        try store.save(data, as: Self.centroidKey)
+        return centroid
     }
 
     public func enroll(images: [CGImage]) throws {
         guard !images.isEmpty else { throw VerificationPipelineError.noImagesProvided }
-        var embeddings: [FaceEmbedding] = []
-        for image in images {
-            embeddings.append(try embedder.embedding(in: image))
+        try saveEnrollment(images.map { try enrollmentSample(from: $0).embedding })
+    }
+
+    public func loadEnrolledCentroid() throws -> FaceEmbedding {
+        let stored = try store.load(Self.centroidKey)
+        guard !stored.isEmpty, stored.count % MemoryLayout<Float>.size == 0 else {
+            throw VerificationPipelineError.corruptEnrollment
         }
-        let centroid = EmbeddingMath.centroid(of: embeddings)
-        let data = centroid.vector.withUnsafeBufferPointer { Data(buffer: $0) }
-        try store.save(data, as: centroidKey)
+        return stored.withUnsafeBytes { FaceEmbedding(vector: Array($0.bindMemory(to: Float.self))) }
+    }
+
+    public func evaluate(image: CGImage, against centroid: FaceEmbedding) throws -> FrameEvaluation {
+        let (face, frame) = try detect(in: image)
+        let liveness = try classifier.liveness(for: face, in: frame)
+        let candidate = try embedder.embedding(for: face, in: frame)
+        // The centroid comes from disk; a dimension mismatch (corrupt file, other build)
+        // must fail closed rather than trip cosineSimilarity's precondition.
+        let similarity = candidate.vector.count == centroid.vector.count ? EmbeddingMath.cosineSimilarity(centroid, candidate) : -1
+        return FrameEvaluation(
+            liveness: liveness.confidence, similarity: similarity,
+            isLive: isLive(liveness), isMatch: similarity >= config.matchThreshold
+        )
     }
 
     public func verify(image: CGImage) throws -> Bool {
-        let faceCrop = try cropper.crop(image)
+        try evaluate(image: image, against: loadEnrolledCentroid()).accepted
+    }
 
-        let liveness = try classifier.classify(faceCrop)
-        guard liveness.isLive, liveness.confidence >= config.livenessThreshold else { return false }
+    private func isLive(_ result: LivenessResult) -> Bool {
+        result.isLive && result.confidence >= config.livenessThreshold
+    }
 
-        let stored = try store.load(centroidKey)
-        let candidate = try embedder.embedding(in: faceCrop)
-
-        // The stored centroid comes from disk and could be corrupted, truncated, or
-        // written by an incompatible build. EmbeddingMath.cosineSimilarity uses
-        // `precondition` on dimension match, which would crash the process (and can't
-        // be caught by `try?`), defeating the fail-safe design. Validate here, the one
-        // place that receives externally-sourced data, before calling into it.
-        guard stored.count == candidate.vector.count * MemoryLayout<Float>.size else { return false }
-
-        let centroid = stored.withUnsafeBytes { rawBuffer -> FaceEmbedding in
-            let floats = rawBuffer.bindMemory(to: Float.self)
-            return FaceEmbedding(vector: Array(floats))
-        }
-        let similarity = EmbeddingMath.cosineSimilarity(centroid, candidate)
-        return similarity >= config.matchThreshold
+    private func detect(in image: CGImage) throws -> (DetectedFace, RGBAImage) {
+        let face = try detector.detectLargestFace(in: image)
+        guard let frame = RGBAImage(cgImage: image) else { throw FaceEmbedderError.inferenceFailed }
+        return (face, frame)
     }
 }
