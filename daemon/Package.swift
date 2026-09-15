@@ -6,6 +6,7 @@ let package = Package(
     platforms: [.macOS(.v14)],
     products: [
         .library(name: "FaceUnlockCore", targets: ["FaceUnlockCore"]),
+        .library(name: "FaceUnlockEngine", targets: ["FaceUnlockEngine"]),
         .executable(name: "faceunlockd", targets: ["FaceUnlockDaemon"]),
     ],
     targets: [
@@ -18,9 +19,14 @@ let package = Package(
                 .copy("Resources/AntiSpoof.LICENSE.txt"),
             ]
         ),
+        .target(
+            name: "FaceUnlockEngine",
+            dependencies: ["FaceUnlockCore"],
+            swiftSettings: [.swiftLanguageMode(.v5)]
+        ),
         .executableTarget(
             name: "FaceUnlockDaemon",
-            dependencies: ["FaceUnlockCore"],
+            dependencies: ["FaceUnlockCore", "FaceUnlockEngine"],
             exclude: ["Info.plist"],
             linkerSettings: [
                 .unsafeFlags([
@@ -35,6 +41,11 @@ let package = Package(
             name: "FaceUnlockCoreTests",
             dependencies: ["FaceUnlockCore"],
             resources: [.copy("Fixtures")]
+        ),
+        .testTarget(
+            name: "FaceUnlockEngineTests",
+            dependencies: ["FaceUnlockEngine", "FaceUnlockCore"],
+            swiftSettings: [.swiftLanguageMode(.v5)]
         ),
     ]
 )

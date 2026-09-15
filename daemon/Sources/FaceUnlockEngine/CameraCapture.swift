@@ -2,7 +2,14 @@ import AVFoundation
 import CoreImage
 import Foundation
 
-enum CameraCaptureError: Error {
+public protocol FrameSource: AnyObject {
+    func start() throws
+    func stop()
+    /// The newest available frame, if its sequence number is greater than `sequence`.
+    func frame(newerThan sequence: Int) -> (image: CGImage, sequence: Int)?
+}
+
+public enum CameraCaptureError: Error {
     case noCameraDevice
     case inputCreationFailed
 }
@@ -10,14 +17,14 @@ enum CameraCaptureError: Error {
 /// On-demand camera: runs only while a verification or enrollment needs frames, so the
 /// camera light is off the rest of the time. Frames from the first `warmup` seconds are
 /// dropped — a webcam's auto-exposure starts dark, and those frames made bad enrollments.
-final class CameraCapture: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate, @unchecked Sendable {
+public final class CameraCapture: NSObject, FrameSource, AVCaptureVideoDataOutputSampleBufferDelegate, @unchecked Sendable {
     private let session = AVCaptureSession()
     private let queue = DispatchQueue(label: "faceunlock.camera")
     private let ciContext = CIContext()
     // Two locks on purpose: stopRunning() waits for in-flight delegate callbacks, so the
     // lock the callback takes (frameLock) must never be held across start/stop.
     private let sessionLock = NSLock()
-    private let lock = NSLock()
+    private let frameLock = NSLock()
     private let warmup: TimeInterval
     private let minFrameInterval: TimeInterval = 0.1
     private var configured = false
@@ -26,11 +33,11 @@ final class CameraCapture: NSObject, AVCaptureVideoDataOutputSampleBufferDelegat
     private var latest: (image: CGImage, sequence: Int)?
     private var sequence = 0
 
-    init(warmup: TimeInterval = 0.8) {
+    public init(warmup: TimeInterval = 0.8) {
         self.warmup = warmup
     }
 
-    func start() throws {
+    public func start() throws {
         sessionLock.lock()
         defer { sessionLock.unlock() }
         if !configured {
@@ -48,43 +55,43 @@ final class CameraCapture: NSObject, AVCaptureVideoDataOutputSampleBufferDelegat
             session.commitConfiguration()
             configured = true
         }
-        lock.withLock {
+        frameLock.withLock {
             latest = nil
             startedAt = Date()
         }
         if !session.isRunning { session.startRunning() }
     }
 
-    func stop() {
+    public func stop() {
         sessionLock.lock()
         defer { sessionLock.unlock() }
         if session.isRunning { session.stopRunning() }
-        lock.withLock {
+        frameLock.withLock {
             latest = nil
             startedAt = .distantFuture
         }
     }
 
-    /// The newest post-warmup frame, if it's newer than `sequence`.
-    func frame(newerThan sequence: Int) -> (image: CGImage, sequence: Int)? {
-        lock.lock()
-        defer { lock.unlock() }
-        guard let latest, latest.sequence > sequence else { return nil }
-        return latest
+    public func frame(newerThan sequence: Int) -> (image: CGImage, sequence: Int)? {
+        frameLock.withLock {
+            guard let latest, latest.sequence > sequence else { return nil }
+            return latest
+        }
     }
 
-    func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
+    public func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
         let now = Date()
-        lock.lock()
-        let wanted = now.timeIntervalSince(startedAt) >= warmup && now.timeIntervalSince(lastConverted) >= minFrameInterval
-        if wanted { lastConverted = now }
-        lock.unlock()
+        let wanted = frameLock.withLock { () -> Bool in
+            let ok = now.timeIntervalSince(startedAt) >= warmup && now.timeIntervalSince(lastConverted) >= minFrameInterval
+            if ok { lastConverted = now }
+            return ok
+        }
         guard wanted, let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
         let ciImage = CIImage(cvPixelBuffer: pixelBuffer)
         guard let cgImage = ciContext.createCGImage(ciImage, from: ciImage.extent) else { return }
-        lock.lock()
-        sequence += 1
-        latest = (cgImage, sequence)
-        lock.unlock()
+        frameLock.withLock {
+            sequence += 1
+            latest = (cgImage, sequence)
+        }
     }
 }

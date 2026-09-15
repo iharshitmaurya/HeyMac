@@ -3,17 +3,19 @@ import ApplicationServices
 import CoreGraphics
 import FaceUnlockCore
 
-enum KeystrokeError: Error {
+public enum KeystrokeError: Error {
     case accessibilityNotGranted
     case eventCreationFailed
 }
 
-final class KeystrokeInjector: PasswordTyping {
-    static func isAccessibilityTrusted() -> Bool {
+public final class KeystrokeInjector: PasswordTyping {
+    public init() {}
+
+    public static func isAccessibilityTrusted() -> Bool {
         return AXIsProcessTrusted()
     }
 
-    func typeAndReturn(_ text: String) throws {
+    public func typeAndReturn(_ text: String) throws {
         guard Self.isAccessibilityTrusted() else {
             throw KeystrokeError.accessibilityNotGranted
         }

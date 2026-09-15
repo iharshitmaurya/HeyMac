@@ -2,45 +2,54 @@ import CoreGraphics
 import Foundation
 import FaceUnlockCore
 
+public struct VerificationOutcome: Equatable, Sendable {
+    public var matched = false
+    public var framesEvaluated = 0
+    public var framesWithoutFace = 0
+    public var bestSimilarity: Float = -1
+    public var bestLiveness: Float = 0
+    public var failure: String?
+
+    public init() {}
+
+    public var summary: String {
+        if let failure { return "FAIL (\(failure))" }
+        let scores = String(format: "frames=%d noFace=%d bestSimilarity=%.3f bestLiveness=%.3f",
+                            framesEvaluated, framesWithoutFace, bestSimilarity, bestLiveness)
+        return (matched ? "OK " : "FAIL ") + scores
+    }
+}
+
+public protocol FaceMatching: AnyObject {
+    func run(timeout: TimeInterval, requiredConsecutive: Int, waitForTurn: TimeInterval,
+             keepGoing: () -> Bool, onFrame: ((FrameEvaluation) -> Void)?) -> VerificationOutcome
+}
+
 /// Runs a bounded verification window over live camera frames. A match needs
 /// `requiredConsecutive` consecutive frames that are both live and above the similarity
-/// threshold, so one lucky frame can't unlock. Only one window runs at a time (the socket
-/// and the lock-screen watcher share the camera).
-final class FaceVerifier: @unchecked Sendable {
-    struct Outcome {
-        var matched = false
-        var framesEvaluated = 0
-        var framesWithoutFace = 0
-        var bestSimilarity: Float = -1
-        var bestLiveness: Float = 0
-        var failure: String?
-
-        var summary: String {
-            if let failure { return "FAIL (\(failure))" }
-            let scores = String(format: "frames=%d noFace=%d bestSimilarity=%.3f bestLiveness=%.3f", framesEvaluated, framesWithoutFace, bestSimilarity, bestLiveness)
-            return (matched ? "OK " : "FAIL ") + scores
-        }
-    }
-
-    private let camera: CameraCapture
+/// threshold, so one lucky frame can't unlock. `sessionLock` is shared by everything that
+/// uses the camera, so only one window or enrollment runs at a time.
+public final class FaceVerifier: FaceMatching, @unchecked Sendable {
+    private let camera: FrameSource
     private let pipeline: VerificationPipeline
-    private let busy = NSLock()
+    private let sessionLock: NSLock
 
-    init(camera: CameraCapture, pipeline: VerificationPipeline) {
+    public init(camera: FrameSource, pipeline: VerificationPipeline, sessionLock: NSLock = NSLock()) {
         self.camera = camera
         self.pipeline = pipeline
+        self.sessionLock = sessionLock
     }
 
-    func run(
+    public func run(
         timeout: TimeInterval, requiredConsecutive: Int = 2, waitForTurn: TimeInterval = 0,
         keepGoing: () -> Bool = { true }, onFrame: ((FrameEvaluation) -> Void)? = nil
-    ) -> Outcome {
-        var outcome = Outcome()
-        guard busy.lock(before: Date().addingTimeInterval(waitForTurn)) else {
-            outcome.failure = "another verification is running"
+    ) -> VerificationOutcome {
+        var outcome = VerificationOutcome()
+        guard sessionLock.lock(before: Date().addingTimeInterval(waitForTurn)) else {
+            outcome.failure = "camera busy with another verification"
             return outcome
         }
-        defer { busy.unlock() }
+        defer { sessionLock.unlock() }
 
         // Load the enrollment before touching the camera: no enrollment or no key access
         // fails instantly, without flashing the camera light.
@@ -48,10 +57,10 @@ final class FaceVerifier: @unchecked Sendable {
         do {
             centroid = try pipeline.loadEnrolledCentroid()
         } catch KeychainKeyProviderError.interactionRequired {
-            outcome.failure = "keychain access needs approval: run 'faceunlockd verify' in Terminal once and choose Always Allow"
+            outcome.failure = "keychain access needs approval: open FaceUnlock and run Test Now"
             return outcome
         } catch SecureStoreError.notFound {
-            outcome.failure = "not enrolled: run 'faceunlockd enroll'"
+            outcome.failure = "not enrolled"
             return outcome
         } catch {
             outcome.failure = "enrollment unavailable: \(error)"

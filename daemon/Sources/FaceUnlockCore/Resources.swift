@@ -3,8 +3,28 @@ import Foundation
 import ImageIO
 
 enum ModelResources {
+    static let bundleName = "FaceUnlockDaemon_FaceUnlockCore.bundle"
+
     static func url(named name: String) -> URL? {
-        Bundle.module.url(forResource: name, withExtension: "mlpkgdata")
+        resourceBundle().url(forResource: name, withExtension: "mlpkgdata")
+    }
+
+    /// SwiftPM's generated `Bundle.module` only looks beside the executable and at the
+    /// absolute build directory, so inside FaceUnlock.app (bundle copied to
+    /// Contents/Resources) it would find the models only on the Mac that built the app —
+    /// and fatalError everywhere else. Look in the app's resources first.
+    static func resourceBundle(searching directories: [URL] = defaultSearchDirectories) -> Bundle {
+        for directory in directories {
+            let url = directory.appendingPathComponent(bundleName)
+            if FileManager.default.fileExists(atPath: url.path), let bundle = Bundle(url: url) {
+                return bundle
+            }
+        }
+        return Bundle.module
+    }
+
+    static var defaultSearchDirectories: [URL] {
+        [Bundle.main.resourceURL, Bundle.main.executableURL?.deletingLastPathComponent()].compactMap { $0 }
     }
 }
 

@@ -3,10 +3,10 @@ import ImageIO
 import Foundation
 
 import FaceUnlockCore
+import FaceUnlockEngine
 
 let usage = """
 usage: faceunlockd [command]
-  (no command)     run the background daemon (started by the LaunchAgent)
   enroll           capture your face (8 live samples)
   verify           test face verification from Terminal, printing per-frame scores
   set-password     store your login password for lock-screen unlock
@@ -23,18 +23,17 @@ let supportDir = FileManager.default.homeDirectoryForCurrentUser
     .appendingPathComponent("Library/Application Support/faceunlock", isDirectory: true)
 try? FileManager.default.createDirectory(at: supportDir, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
 try? FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: supportDir.path)
-let socketPath = supportDir.appendingPathComponent("faceunlock.sock").path
 enum StoredItem { static let password = "login-password" }
 
 let args = CommandLine.arguments
-let command = args.count > 1 ? args[1] : "daemon"
+let command = args.count > 1 ? args[1] : "help"
 if ["-h", "--help", "help"].contains(command) {
     print(usage)
     exit(0)
 }
 
-// Only the daemon is non-interactive: it must never wait on a dialog nobody sees.
-let keyProvider = CachingKeyProvider(wrapping: KeychainKeyProvider(account: NSUserName(), interactive: command != "daemon"))
+// The CLI is always run by a person, so Keychain access may prompt.
+let keyProvider = CachingKeyProvider(wrapping: KeychainKeyProvider(account: NSUserName(), interactive: true))
 let store = SecureStore(keyProvider: keyProvider, directory: supportDir)
 
 switch command {
@@ -65,7 +64,7 @@ case "clear-password":
         print("Failed to remove stored password: \(error)")
         exit(1)
     }
-case "daemon", "enroll", "verify", "diagnose":
+case "enroll", "verify", "diagnose":
     break
 default:
     print(usage)
@@ -189,99 +188,5 @@ if command == "verify" {
     exit(outcome.matched ? 0 : 1)
 }
 
-// MARK: - Daemon
-
-setvbuf(stdout, nil, _IOLBF, 0)
-
-let server = SocketServer(path: socketPath, handler: { message in
-    switch message {
-    case .verify, .verifyLock:
-        // PAM waits up to 10s: 1s to get the camera if a lock-screen window holds it,
-        // then a 5s window including camera start-up and exposure warm-up.
-        let outcome = verifier.run(timeout: 5, waitForTurn: 1)
-        log("socket \(message): \(outcome.summary)")
-        return outcome.matched ? .ok : .fail
-    case .ok, .fail:
-        return .fail
-    }
-})
-do {
-    try server.start()
-} catch {
-    log("socket server failed to start: \(error)")
-    exit(1)
-}
-
-struct LockStateAdapter: LockStateChecking {
-    func isLocked() -> Bool? { isScreenLocked() }
-}
-
-/// Lock-screen unlock: while the screen is locked and the display is on, look for the
-/// enrolled face; type the stored password at most once per lock episode (a wrong stored
-/// password must not be retried into an account lockout). The camera runs only while the
-/// display is awake, so a locked Mac with the display asleep keeps the camera off.
-final class LockScreenUnlocker: @unchecked Sendable {
-    private let store: SecureStore
-    private let verifier: FaceVerifier
-    private let watcher = ScreensaverWatcher(
-        lockChecker: LockStateAdapter(),
-        typist: KeystrokeInjector(),
-        wakeDisplay: {
-            let task = Process()
-            task.executableURL = URL(fileURLWithPath: "/usr/bin/caffeinate")
-            task.arguments = ["-u", "-t", "1"]
-            try? task.run()
-            task.waitUntilExit()
-        }
-    )
-
-    init(store: SecureStore, verifier: FaceVerifier) {
-        self.store = store
-        self.verifier = verifier
-    }
-
-    func start() {
-        Thread.detachNewThread { self.loop() }
-    }
-
-    private static func displayIsAwake() -> Bool { CGDisplayIsAsleep(CGMainDisplayID()) == 0 }
-
-    private func loop() {
-        var attemptedThisEpisode = false
-        var loggedBlocker: String?
-        while true {
-            Thread.sleep(forTimeInterval: 1)
-            guard isScreenLocked() == true else {
-                attemptedThisEpisode = false
-                loggedBlocker = nil
-                continue
-            }
-            guard !attemptedThisEpisode, Self.displayIsAwake() else { continue }
-            let password: String
-            do {
-                guard let text = String(data: try store.load(StoredItem.password), encoding: .utf8) else { continue }
-                password = text
-            } catch {
-                let reason = "stored password unavailable (\(error))"
-                if loggedBlocker != reason { log("lock screen: \(reason)"); loggedBlocker = reason }
-                continue
-            }
-            let outcome = verifier.run(timeout: 30, keepGoing: { isScreenLocked() == true && Self.displayIsAwake() })
-            guard outcome.matched else {
-                if outcome.failure != nil, loggedBlocker != outcome.summary { log("lock screen: \(outcome.summary)"); loggedBlocker = outcome.summary }
-                continue
-            }
-            attemptedThisEpisode = true
-            do {
-                try watcher.attemptUnlock(password: password)
-                log("lock screen: face matched, password typed (\(outcome.summary))")
-            } catch {
-                log("lock screen: face matched but unlock not attempted: \(error)")
-            }
-        }
-    }
-}
-
-LockScreenUnlocker(store: store, verifier: verifier).start()
-log("faceunlockd running, socket at \(socketPath)")
-RunLoop.main.run()
+print(usage)
+exit(2)
