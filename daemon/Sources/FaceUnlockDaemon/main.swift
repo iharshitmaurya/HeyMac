@@ -135,50 +135,24 @@ if command == "enroll" {
         print("Keychain access failed: \(error)")
         exit(1)
     }
-    let target = 8
-    print("Look straight at the camera in good light. Capturing \(target) live samples...")
-    do { try camera.start() } catch { print("Camera unavailable: \(error)"); exit(1) }
-    var samples: [FaceEmbedding] = []
-    var lastSequence = 0
-    var lastSample = Date.distantPast
-    var lastLivenessWarning = Date.distantPast
-    let deadline = Date().addingTimeInterval(40)
-    while samples.count < target, Date() < deadline {
-        guard Date().timeIntervalSince(lastSample) >= 0.25, let frame = camera.frame(newerThan: lastSequence) else {
-            Thread.sleep(forTimeInterval: 0.03)
-            continue
-        }
-        lastSequence = frame.sequence
-        do {
-            let sample = try pipeline.enrollmentSample(from: frame.image)
-            samples.append(sample.embedding)
-            lastSample = Date()
-            print(String(format: "  sample %d/%d (liveness %.3f)", samples.count, target, sample.liveness.confidence))
-        } catch VerificationPipelineError.notLive(let confidence) {
-            if Date().timeIntervalSince(lastLivenessWarning) > 2 {
-                print(String(format: "  frame rejected by liveness check (%.3f) — use a real face, even lighting, no screen/photo", confidence))
-                lastLivenessWarning = Date()
-            }
-        } catch {
-            continue
+    print("Look straight at the camera in good light. Capturing live samples...")
+    let enroller = Enroller(frames: camera, sampler: pipeline)
+    var failure: String?
+    let ok = enroller.run { progress in
+        switch progress {
+        case .sampleCaptured(let count, let target, let liveness):
+            print(String(format: "  sample %d/%d (liveness %.3f)", count, target, liveness))
+        case .rejectedNotLive(let confidence):
+            print(String(format: "  frame rejected by the liveness check (%.3f) — use a real face, even lighting, no photo or screen", confidence))
+        case .finished(let minAgreement, let meanAgreement):
+            print(String(format: "Enrollment saved. Sample agreement with the enrolled face: min %.3f, mean %.3f.", minAgreement, meanAgreement))
+            print("Test it now with: faceunlockd verify")
+        case .failed(let message):
+            failure = message
         }
     }
-    camera.stop()
-    guard samples.count == target else {
-        print("Only captured \(samples.count)/\(target) samples in 40s. Check lighting and that your face is centered, then retry.")
-        exit(1)
-    }
-    do {
-        let centroid = try pipeline.saveEnrollment(samples)
-        let consistency = samples.map { EmbeddingMath.cosineSimilarity(centroid, $0) }
-        print(String(format: "Enrollment saved. Sample agreement with enrolled face: min %.3f, mean %.3f.",
-                     consistency.min() ?? 0, consistency.reduce(0, +) / Float(consistency.count)))
-        print("Test it now with: faceunlockd verify")
-        exit(0)
-    } catch {
-        print("Saving enrollment failed: \(error)")
-        exit(1)
-    }
+    if let failure { print(failure) }
+    exit(ok ? 0 : 1)
 }
 
 if command == "verify" {
