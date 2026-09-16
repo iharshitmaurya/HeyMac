@@ -13,6 +13,14 @@ public final class CachingKeyProvider: SymmetricKeyProviding {
         self.wrapped = provider
     }
 
+    /// Forgets the cached key, so the next fetch consults the Keychain again (used after
+    /// the key is deleted, so a later enrollment can't be encrypted with a stale key).
+    public func clearCache() {
+        lock.lock()
+        defer { lock.unlock() }
+        cached = nil
+    }
+
     public func fetchOrCreateKey() throws -> SymmetricKey {
         lock.lock()
         defer { lock.unlock() }

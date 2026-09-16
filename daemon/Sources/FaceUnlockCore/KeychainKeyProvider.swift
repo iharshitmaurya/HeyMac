@@ -46,6 +46,20 @@ public final class KeychainKeyProvider: SymmetricKeyProviding {
         return key
     }
 
+    /// Removes the stored key. Data encrypted with it becomes unreadable, so this is only
+    /// for "remove my face data".
+    public func deleteKey() throws {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: account,
+        ]
+        let status = SecItemDelete(query as CFDictionary)
+        guard status == errSecSuccess || status == errSecItemNotFound else {
+            throw KeychainKeyProviderError.storeFailed(status)
+        }
+    }
+
     private func readKey() throws -> SymmetricKey? {
         var query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
