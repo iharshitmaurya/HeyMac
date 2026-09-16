@@ -4,3 +4,4 @@
 .superpowers/
 pam/*.so
 .DS_Store
+dist/

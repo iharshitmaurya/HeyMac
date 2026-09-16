@@ -8,6 +8,7 @@ let package = Package(
         .library(name: "FaceUnlockCore", targets: ["FaceUnlockCore"]),
         .library(name: "FaceUnlockEngine", targets: ["FaceUnlockEngine"]),
         .executable(name: "faceunlockd", targets: ["FaceUnlockDaemon"]),
+        .executable(name: "FaceUnlock", targets: ["FaceUnlockApp"]),
     ],
     targets: [
         .target(
@@ -36,6 +37,11 @@ let package = Package(
                     "-Xlinker", "Sources/FaceUnlockDaemon/Info.plist",
                 ])
             ]
+        ),
+        .executableTarget(
+            name: "FaceUnlockApp",
+            dependencies: ["FaceUnlockCore", "FaceUnlockEngine"],
+            swiftSettings: [.swiftLanguageMode(.v5)]
         ),
         .testTarget(
             name: "FaceUnlockCoreTests",

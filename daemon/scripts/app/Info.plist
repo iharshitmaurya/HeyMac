@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleIdentifier</key>
+	<string>com.faceunlock.app</string>
+	<key>CFBundleName</key>
+	<string>FaceUnlock</string>
+	<key>CFBundleDisplayName</key>
+	<string>FaceUnlock</string>
+	<key>CFBundleExecutable</key>
+	<string>FaceUnlock</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>__VERSION__</string>
+	<key>CFBundleVersion</key>
+	<string>__VERSION__</string>
+	<key>CFBundleIconFile</key>
+	<string>AppIcon</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>14.0</string>
+	<key>LSUIElement</key>
+	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>FaceUnlock uses the camera to recognize your face for sudo and lock-screen unlock. Images never leave this Mac.</string>
+	<key>NSHumanReadableCopyright</key>
+	<string>Face unlock for Apple Silicon Macs. Models: ArcFace (MIT) and MiniFASNetV2 (Apache-2.0).</string>
+</dict>
+</plist>
