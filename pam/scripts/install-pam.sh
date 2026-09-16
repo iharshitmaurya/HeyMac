@@ -3,6 +3,9 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PAM_ROOT="$(dirname "$SCRIPT_DIR")"
+# Optional argument: an already-built pam_faceunlock.so (FaceUnlock.app ships one, so
+# installing needs no compiler on the Mac it is installed on).
+PREBUILT_MODULE="${1:-}"
 
 MODULE_DIR="/usr/local/lib/pam"
 MODULE_PATH="$MODULE_DIR/pam_faceunlock.so"
@@ -17,15 +20,22 @@ if ! grep -q 'sudo_local' "$SUDO_PAM"; then
     exit 1
 fi
 
-echo "Building pam_faceunlock.so..."
-(cd "$PAM_ROOT" && make)
+if [ -n "$PREBUILT_MODULE" ]; then
+    [ -f "$PREBUILT_MODULE" ] || { echo "ERROR: prebuilt module not found: $PREBUILT_MODULE" >&2; exit 1; }
+    SOURCE_MODULE="$PREBUILT_MODULE"
+    echo "Installing prebuilt module $SOURCE_MODULE..."
+else
+    echo "Building pam_faceunlock.so..."
+    (cd "$PAM_ROOT" && make)
 
-echo "Running unit tests before installing..."
-(cd "$PAM_ROOT" && make test)
+    echo "Running unit tests before installing..."
+    (cd "$PAM_ROOT" && make test)
+    SOURCE_MODULE="$PAM_ROOT/pam_faceunlock.so"
+fi
 
 echo "Installing module to $MODULE_PATH (requires sudo)..."
 sudo mkdir -p "$MODULE_DIR"
-sudo cp "$PAM_ROOT/pam_faceunlock.so" "$MODULE_PATH"
+sudo cp "$SOURCE_MODULE" "$MODULE_PATH"
 sudo chown root:wheel "$MODULE_PATH"
 sudo chmod 644 "$MODULE_PATH"
 
