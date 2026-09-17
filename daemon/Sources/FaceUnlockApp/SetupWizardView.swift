@@ -156,18 +156,11 @@ struct SetupWizardView: View {
             Text("Let's check that FaceUnlock recognizes you.")
                 .frame(maxWidth: .infinity, alignment: .leading)
             testPreview
-            Group {
-                if flow.testing {
-                    ProgressView()
-                } else if let message = flow.testMessage {
-                    Label(message, systemImage: flow.testPassed ? "checkmark.circle.fill" : "xmark.circle.fill")
-                        .foregroundStyle(flow.testPassed ? Theme.good : Theme.warn)
-                        .font(.system(size: 12.5))
-                } else {
-                    Text(" ")
-                }
+            HStack(spacing: 10) {
+                MatchFeedbackView(state: matchState)
+                Text(matchCaption).font(.system(size: 12.5)).foregroundStyle(.secondary)
             }
-            .frame(maxWidth: .infinity, minHeight: 16, alignment: .leading)
+            .frame(maxWidth: .infinity, minHeight: 20, alignment: .leading)
             HStack(spacing: 10) {
                 Button(flow.testing ? "Checking…" : "Test Now") { flow.runTest() }
                     .buttonStyle(PillButtonStyle(kind: .primary))
@@ -188,6 +181,17 @@ struct SetupWizardView: View {
 
     /// Circular, centered — matches the enrollment preview's framing so the two screens
     /// read as the same "camera moment," not two different UI styles.
+    private var matchState: MatchState {
+        if flow.testing { return .idle }
+        if flow.testMessage != nil { return flow.testPassed ? .success : .fail }
+        return .idle
+    }
+
+    private var matchCaption: String {
+        if flow.testing { return "Scanning…" }
+        return flow.testMessage ?? " "
+    }
+
     private var testPreview: some View {
         ZStack {
             Circle().fill(.black.opacity(0.85)).frame(width: 220, height: 220)
