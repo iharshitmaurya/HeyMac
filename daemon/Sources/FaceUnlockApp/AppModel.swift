@@ -145,6 +145,7 @@ final class AppModel {
         case .lockScreenUnlocked:
             lastEvent = "lock screen unlocked \(time)"
             countUnlock()
+            UnlockHUD.shared.showUnlocked()
         case .lockScreenPasswordRejected:
             lastEvent = "stored password rejected \(time)"
             lockScreenNeedsPassword = true
