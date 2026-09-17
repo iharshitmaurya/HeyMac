@@ -25,12 +25,15 @@ struct SetupWizardView: View {
 
     private var welcome: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Image(systemName: "faceid").font(.system(size: 52)).foregroundStyle(.tint)
+            Image(systemName: "faceid").font(.system(size: 52)).foregroundStyle(Theme.accent)
             Text("Unlock sudo in Terminal and your lock screen by looking at the camera.")
             Label("Your face stays on this Mac, stored encrypted as numbers — not photos.", systemImage: "lock.shield")
             Label("Your password always keeps working. Face unlock is only a shortcut.", systemImage: "key")
             Label("The camera runs only while a check is happening.", systemImage: "video")
-            Button("Get Started") { flow.advance() }.keyboardShortcut(.defaultAction)
+            Button("Get Started") { flow.advance() }
+                .buttonStyle(PillButtonStyle(kind: .primary))
+                .keyboardShortcut(.defaultAction)
+                .padding(.top, 6)
         }
     }
 
@@ -38,17 +41,26 @@ struct SetupWizardView: View {
         VStack(alignment: .leading, spacing: 14) {
             Text("FaceUnlock needs the camera to recognize you.")
             if flow.cameraAuthorized {
-                Label("Camera access granted.", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
-                Button("Continue") { flow.advance() }.keyboardShortcut(.defaultAction)
+                Label("Camera access granted.", systemImage: "checkmark.circle.fill").foregroundStyle(Theme.good)
+                Button("Continue") { flow.advance() }
+                    .buttonStyle(PillButtonStyle(kind: .primary))
+                    .keyboardShortcut(.defaultAction)
+                    .padding(.top, 6)
             } else if flow.cameraDenied {
-                Label("Camera access was denied.", systemImage: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+                Label("Camera access was denied.", systemImage: "exclamationmark.triangle.fill").foregroundStyle(Theme.warn)
                 Text("Turn it on in System Settings, then come back to this window.")
-                HStack {
+                HStack(spacing: 10) {
                     Button("Open System Settings") { flow.model.openSystemSettings(anchor: "Privacy_Camera") }
+                        .buttonStyle(PillButtonStyle(kind: .primary))
                     Button("Check Again") { flow.refreshCameraStatus() }
+                        .buttonStyle(PillButtonStyle(kind: .secondary))
                 }
+                .padding(.top, 6)
             } else {
-                Button("Allow Camera Access") { flow.requestCamera() }.keyboardShortcut(.defaultAction)
+                Button("Allow Camera Access") { flow.requestCamera() }
+                    .buttonStyle(PillButtonStyle(kind: .primary))
+                    .keyboardShortcut(.defaultAction)
+                    .padding(.top, 6)
             }
         }
     }
@@ -61,12 +73,17 @@ struct SetupWizardView: View {
             sampleDots
             Text(flow.enrollHint.isEmpty ? " " : flow.enrollHint)
                 .font(.system(size: 12.5)).foregroundStyle(.secondary)
-            HStack {
+                .frame(minHeight: 16)
+            HStack(spacing: 10) {
                 Button(flow.enrolling ? "Enrolling…" : "Start Enrolling") { flow.startEnrollment() }
+                    .buttonStyle(PillButtonStyle(kind: .primary))
                     .disabled(flow.enrolling)
                     .keyboardShortcut(.defaultAction)
-                if flow.enrollFinished { Button("Continue") { flow.advance() } }
+                if flow.enrollFinished {
+                    Button("Continue") { flow.advance() }.buttonStyle(PillButtonStyle(kind: .secondary))
+                }
             }
+            .padding(.top, 4)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
@@ -135,25 +152,58 @@ struct SetupWizardView: View {
     }
 
     private var test: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(spacing: 18) {
             Text("Let's check that FaceUnlock recognizes you.")
-            preview
-            if flow.testing { ProgressView() }
-            if let message = flow.testMessage {
-                Label(message, systemImage: flow.testPassed ? "checkmark.circle.fill" : "xmark.circle.fill")
-                    .foregroundStyle(flow.testPassed ? .green : .orange)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            testPreview
+            Group {
+                if flow.testing {
+                    ProgressView()
+                } else if let message = flow.testMessage {
+                    Label(message, systemImage: flow.testPassed ? "checkmark.circle.fill" : "xmark.circle.fill")
+                        .foregroundStyle(flow.testPassed ? Theme.good : Theme.warn)
+                        .font(.system(size: 12.5))
+                } else {
+                    Text(" ")
+                }
             }
-            HStack {
+            .frame(maxWidth: .infinity, minHeight: 16, alignment: .leading)
+            HStack(spacing: 10) {
                 Button(flow.testing ? "Checking…" : "Test Now") { flow.runTest() }
+                    .buttonStyle(PillButtonStyle(kind: .primary))
                     .disabled(flow.testing)
                     .keyboardShortcut(.defaultAction)
                 if flow.model.setupComplete {
-                    Button("Close") { flow.close() }
+                    Button("Close") { flow.close() }.buttonStyle(PillButtonStyle(kind: .secondary))
                 } else {
-                    Button("Continue") { flow.advance() }.disabled(!flow.testPassed)
+                    Button("Continue") { flow.advance() }
+                        .buttonStyle(PillButtonStyle(kind: .secondary))
+                        .disabled(!flow.testPassed)
                 }
             }
+            .padding(.top, 4)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
+    }
+
+    /// Circular, centered — matches the enrollment preview's framing so the two screens
+    /// read as the same "camera moment," not two different UI styles.
+    private var testPreview: some View {
+        ZStack {
+            Circle().fill(.black.opacity(0.85)).frame(width: 220, height: 220)
+            if let image = flow.preview {
+                Image(decorative: image, scale: 1)
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+                    .scaleEffect(x: -1, y: 1)
+                    .frame(width: 220, height: 220)
+                    .clipShape(Circle())
+            } else {
+                Text("Camera off").font(.system(size: 12)).foregroundStyle(.secondary)
+            }
+            Circle().stroke(Color.primary.opacity(0.1), lineWidth: 6).frame(width: 236, height: 236)
+        }
+        .frame(width: 236, height: 236)
     }
 
     private var features: some View {
@@ -161,7 +211,7 @@ struct SetupWizardView: View {
             VStack(alignment: .leading, spacing: 6) {
                 Toggle("Unlock sudo with my face", isOn: Binding(
                     get: { flow.model.sudoEnabled }, set: { flow.model.setSudoEnabled($0) }
-                )).disabled(flow.model.busy)
+                )).tint(Theme.accent).disabled(flow.model.busy)
                 Text("Adds face unlock to sudo in Terminal. macOS asks for your admin password once to install it.")
                     .font(.caption).foregroundStyle(.secondary)
             }
@@ -173,33 +223,41 @@ struct SetupWizardView: View {
                 Text("FaceUnlock types your login password for you when it recognizes your face. It needs your password stored, encrypted, on this Mac.")
                     .font(.caption).foregroundStyle(.secondary)
                 SecureField("Login password", text: Binding(get: { flow.password }, set: { flow.password = $0 }))
+                    .textFieldStyle(.roundedBorder)
                 SecureField("Confirm password", text: Binding(get: { flow.passwordConfirm }, set: { flow.passwordConfirm = $0 }))
-                Button("Save Password") { flow.saveLoginPassword() }
+                    .textFieldStyle(.roundedBorder)
+                Button("Save Password") { flow.saveLoginPassword() }.buttonStyle(PillButtonStyle(kind: .secondary))
                 if let message = flow.passwordMessage { Text(message).font(.caption).foregroundStyle(.secondary) }
                 if flow.model.lockScreenEnabled {
                     if flow.model.accessibilityTrusted {
-                        Label("Accessibility permission granted.", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
+                        Label("Accessibility permission granted.", systemImage: "checkmark.circle.fill").foregroundStyle(Theme.good)
                     } else {
                         Label("Needs Accessibility permission to type the password.", systemImage: "exclamationmark.triangle.fill")
-                            .foregroundStyle(.orange)
+                            .foregroundStyle(Theme.warn)
                         Button("Grant Accessibility Permission") { flow.model.requestAccessibility() }
+                            .buttonStyle(PillButtonStyle(kind: .secondary))
                     }
                 }
             }
 
-            Button("Continue") { flow.advance() }.keyboardShortcut(.defaultAction)
+            Button("Continue") { flow.advance() }
+                .buttonStyle(PillButtonStyle(kind: .primary))
+                .keyboardShortcut(.defaultAction)
         }
     }
 
     private var done: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Label("FaceUnlock is ready.", systemImage: "checkmark.seal.fill").foregroundStyle(.green)
+            Label("FaceUnlock is ready.", systemImage: "checkmark.seal.fill").foregroundStyle(Theme.good)
             Text("Look for the face icon in the menu bar. From there you can pause it, test it, or change settings.")
             if flow.model.sudoEnabled {
                 Text("Try it: open Terminal and run `sudo -k; sudo whoami` while looking at the camera.")
                     .font(.callout).foregroundStyle(.secondary)
             }
-            Button("Done") { flow.finish() }.keyboardShortcut(.defaultAction)
+            Button("Done") { flow.finish() }
+                .buttonStyle(PillButtonStyle(kind: .primary))
+                .keyboardShortcut(.defaultAction)
+                .padding(.top, 6)
         }
     }
 
@@ -215,20 +273,4 @@ struct SetupWizardView: View {
         }
     }
 
-    @ViewBuilder private var preview: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: 12).fill(.black.opacity(0.85))
-            if let image = flow.preview {
-                Image(decorative: image, scale: 1)
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-                    .scaleEffect(x: -1, y: 1)  // mirror, so moving left looks left
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-            } else {
-                Text("Camera off").foregroundStyle(.secondary)
-            }
-        }
-        .frame(height: 220)
-        .frame(maxWidth: .infinity)
-    }
 }
