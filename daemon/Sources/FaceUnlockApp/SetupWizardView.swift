@@ -54,20 +54,82 @@ struct SetupWizardView: View {
     }
 
     private var enroll: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(spacing: 18) {
             Text("Look straight at the camera in good, even light.")
-            preview
-            if flow.enrolling {
-                ProgressView(value: Double(flow.samplesCaptured), total: Double(flow.sampleTarget)) {
-                    Text("Captured \(flow.samplesCaptured) of \(flow.sampleTarget)")
-                }
-            }
-            if !flow.enrollHint.isEmpty { Text(flow.enrollHint).foregroundStyle(.secondary) }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            enrollPreview
+            sampleDots
+            Text(flow.enrollHint.isEmpty ? " " : flow.enrollHint)
+                .font(.system(size: 12.5)).foregroundStyle(.secondary)
             HStack {
                 Button(flow.enrolling ? "Enrolling…" : "Start Enrolling") { flow.startEnrollment() }
                     .disabled(flow.enrolling)
                     .keyboardShortcut(.defaultAction)
                 if flow.enrollFinished { Button("Continue") { flow.advance() } }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    /// The circular preview, ringed by one continuous progress arc that closes as live
+    /// samples come in, ending in a checkmark that draws itself in
+    /// pose-tracked tick ring (we don't guide head turns, just take 8 live samples), but
+    /// the same idea of "progress you can see without reading a number."
+    private var enrollPreview: some View {
+        ZStack {
+            Circle().fill(.black.opacity(0.85))
+                .frame(width: 220, height: 220)
+
+            if let image = flow.preview, !flow.enrollFinished {
+                Image(decorative: image, scale: 1)
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+                    .scaleEffect(x: -1, y: 1) // mirror, so moving left looks left
+                    .frame(width: 220, height: 220)
+                    .clipShape(Circle())
+            } else if !flow.enrollFinished {
+                Text("Camera off").font(.system(size: 12)).foregroundStyle(.secondary)
+            }
+
+            Circle()
+                .stroke(Color.primary.opacity(0.1), lineWidth: 6)
+                .frame(width: 236, height: 236)
+            Circle()
+                .trim(from: 0, to: enrollProgress)
+                .stroke(Theme.accent, style: StrokeStyle(lineWidth: 6, lineCap: .round))
+                .frame(width: 236, height: 236)
+                .rotationEffect(.degrees(-90))
+                .animation(.easeInOut(duration: 0.3), value: flow.samplesCaptured)
+
+            if flow.enrollFinished {
+                ZStack {
+                    Circle().fill(Theme.good.opacity(0.16)).frame(width: 74, height: 74)
+                    CheckmarkShape()
+                        .trim(from: 0, to: flow.enrollFinished ? 1 : 0)
+                        .stroke(Theme.good, style: StrokeStyle(lineWidth: 7, lineCap: .round, lineJoin: .round))
+                        .frame(width: 34, height: 34)
+                }
+                .transition(.scale(scale: 0.6).combined(with: .opacity))
+                .animation(.easeOut(duration: 0.45), value: flow.enrollFinished)
+            }
+        }
+        .frame(width: 236, height: 236)
+    }
+
+    private var enrollProgress: Double {
+        flow.sampleTarget > 0 ? Double(flow.samplesCaptured) / Double(flow.sampleTarget) : 0
+    }
+
+    /// One dot per sample, filled as each one lands — discrete progress a pose-tracked
+    /// ring doesn't need to show, since we're not confirming a head direction, just a count.
+    private var sampleDots: some View {
+        HStack(spacing: 8) {
+            ForEach(0..<flow.sampleTarget, id: \.self) { index in
+                Circle()
+                    .fill(index < flow.samplesCaptured ? Theme.accent : Color.primary.opacity(0.14))
+                    .frame(width: 7, height: 7)
+                    .scaleEffect(index == flow.samplesCaptured - 1 ? 1.4 : 1)
+                    .animation(.spring(response: 0.32, dampingFraction: 0.55), value: flow.samplesCaptured)
             }
         }
     }
@@ -138,6 +200,18 @@ struct SetupWizardView: View {
                     .font(.callout).foregroundStyle(.secondary)
             }
             Button("Done") { flow.finish() }.keyboardShortcut(.defaultAction)
+        }
+    }
+
+    /// A hand-drawn checkmark path, traced in via `.trim` rather than an SF Symbol —
+    /// the enrollment ring closing into a check that draws itself is the payoff moment.
+    private struct CheckmarkShape: Shape {
+        func path(in rect: CGRect) -> Path {
+            var path = Path()
+            path.move(to: CGPoint(x: rect.minX + rect.width * 0.16, y: rect.minY + rect.height * 0.52))
+            path.addLine(to: CGPoint(x: rect.minX + rect.width * 0.42, y: rect.minY + rect.height * 0.78))
+            path.addLine(to: CGPoint(x: rect.minX + rect.width * 0.86, y: rect.minY + rect.height * 0.2))
+            return path
         }
     }
 
