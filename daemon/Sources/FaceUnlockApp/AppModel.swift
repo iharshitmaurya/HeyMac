@@ -34,6 +34,8 @@ final class AppModel {
     private(set) var busy = false
     private(set) var lastEvent = "no checks yet"
     private(set) var startupError: String?
+    private(set) var unlocksToday = 0
+    private var unlocksTodayKey = "" // yyyy-MM-dd; a new day resets the count
     var actionError: String?
 
     private init() {
@@ -139,14 +141,25 @@ final class AppModel {
         switch event {
         case .sudo(let matched, _):
             lastEvent = matched ? "sudo unlocked \(time)" : "sudo not recognized \(time)"
+            if matched { countUnlock() }
         case .lockScreenUnlocked:
             lastEvent = "lock screen unlocked \(time)"
+            countUnlock()
         case .lockScreenPasswordRejected:
             lastEvent = "stored password rejected \(time)"
             lockScreenNeedsPassword = true
         case .lockScreenProblem(let reason):
             lastEvent = reason
         }
+    }
+
+    private func countUnlock() {
+        let today = Date().formatted(.iso8601.year().month().day())
+        if unlocksTodayKey != today {
+            unlocksTodayKey = today
+            unlocksToday = 0
+        }
+        unlocksToday += 1
     }
 
     // MARK: - Actions
@@ -300,7 +313,7 @@ final class AppModel {
     }
 
     func openSettings() {
-        windows.show(id: "settings", title: "FaceUnlock Settings", size: CGSize(width: 460, height: 460)) {
+        windows.show(id: "settings", title: "FaceUnlock Settings", size: CGSize(width: 560, height: 460)) {
             SettingsView(model: self)
         }
     }

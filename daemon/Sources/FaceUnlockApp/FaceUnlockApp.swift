@@ -22,5 +22,6 @@ struct FaceUnlockApp: App {
         } label: {
             Image(systemName: model.menuIconName)
         }
+        .menuBarExtraStyle(.window)
     }
 }
