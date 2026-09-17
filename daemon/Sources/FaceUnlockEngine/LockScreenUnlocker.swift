@@ -135,6 +135,7 @@ public final class LockScreenUnlocker: @unchecked Sendable {
             return report("stored password unavailable (\(error))")
         }
 
+        onEvent(.lockScreenScanning)
         let outcome = matcher.run(
             timeout: 30, requiredConsecutive: 2, waitForTurn: 0,
             keepGoing: { !self.isStopRequested && !self.settings.paused && self.environment.isLocked() == true && self.environment.displayIsAwake() },

@@ -142,16 +142,18 @@ final class AppModel {
         case .sudo(let matched, _):
             lastEvent = matched ? "sudo unlocked \(time)" : "sudo not recognized \(time)"
             if matched { countUnlock() }
+        case .lockScreenScanning:
+            lastEvent = "lock screen scanning \(time)"
         case .lockScreenUnlocked:
             lastEvent = "lock screen unlocked \(time)"
             countUnlock()
-            UnlockHUD.shared.showUnlocked()
         case .lockScreenPasswordRejected:
             lastEvent = "stored password rejected \(time)"
             lockScreenNeedsPassword = true
         case .lockScreenProblem(let reason):
             lastEvent = reason
         }
+        LockScreenOverlay.shared.handle(event)
     }
 
     private func countUnlock() {

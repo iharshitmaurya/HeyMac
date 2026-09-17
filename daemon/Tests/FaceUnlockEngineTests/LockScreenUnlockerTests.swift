@@ -22,7 +22,7 @@ private func makeUnlocker(
 
     #expect(unlocker.tick() == .unlocked)
     #expect(typist.typed == ["hunter2"])
-    #expect(recorder.events == [.lockScreenUnlocked(summary: matchedOutcome().summary)])
+    #expect(recorder.events == [.lockScreenScanning, .lockScreenUnlocked(summary: matchedOutcome().summary)])
     #expect(settings.lockScreenNeedsPassword == false)
 }
 
@@ -37,7 +37,7 @@ private func makeUnlocker(
 
     #expect(unlocker.tick() == .passwordRejected)
     #expect(settings.lockScreenNeedsPassword == true)
-    #expect(recorder.events == [.lockScreenPasswordRejected])
+    #expect(recorder.events == [.lockScreenScanning, .lockScreenPasswordRejected])
 
     // Same lock episode: no second attempt.
     #expect(unlocker.tick() == .alreadyAttempted)
