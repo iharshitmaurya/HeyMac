@@ -64,6 +64,7 @@ public enum LockScreenTick: Equatable {
 /// user saves it again, so a stale password can't lock the account out.
 public final class LockScreenUnlocker: @unchecked Sendable {
     static let unlockConfirmationDelay: TimeInterval = 5
+    static let unlockPollInterval: TimeInterval = 0.15
     static let pollInterval: TimeInterval = 1
 
     private let matcher: FaceMatching
@@ -153,14 +154,21 @@ public final class LockScreenUnlocker: @unchecked Sendable {
             return .typingFailed("\(error)")
         }
 
-        environment.sleep(Self.unlockConfirmationDelay)
-        if environment.isLocked() == true {
-            settings.lockScreenNeedsPassword = true
-            onEvent(.lockScreenPasswordRejected)
-            return .passwordRejected
+        // Poll rather than sleep-then-check-once: a correct password unlocks in well
+        // under a second, and the HUD should appear the moment it does, not after a
+        // flat wait. Still gives a wrong/stale password the full window before giving up.
+        var elapsed: TimeInterval = 0
+        while elapsed < Self.unlockConfirmationDelay {
+            environment.sleep(Self.unlockPollInterval)
+            elapsed += Self.unlockPollInterval
+            if environment.isLocked() == false {
+                onEvent(.lockScreenUnlocked(summary: outcome.summary))
+                return .unlocked
+            }
         }
-        onEvent(.lockScreenUnlocked(summary: outcome.summary))
-        return .unlocked
+        settings.lockScreenNeedsPassword = true
+        onEvent(.lockScreenPasswordRejected)
+        return .passwordRejected
     }
 
     private func report(_ problem: String) -> LockScreenTick {
