@@ -29,6 +29,8 @@ final class AppModel {
     private(set) var strictness: MatchStrictness = .normal
     private(set) var launchAtLogin = true
     private(set) var animationStyle = UnlockAnimationStyle.saved
+    private(set) var appLockEnabled = false
+    private(set) var appLockApps: [LockedApp] = []
     private(set) var pamStatus: PamStatus = .notInstalled
     private(set) var accessibilityTrusted = false
     private(set) var cameraAuthorized = false
@@ -57,6 +59,11 @@ final class AppModel {
         refreshSystemState()
         applyLaunchAtLogin()
         restartEngine()
+        AppLockController.shared.faceMatcher = { [weak self] in
+            guard let self, self.setupComplete, !self.paused, let runtime = self.runtime else { return nil }
+            return runtime.verifier(interactive: false, strictness: self.strictness)
+        }
+        AppLockController.shared.start()
 
         Timer.scheduledTimer(withTimeInterval: 3, repeats: true) { _ in
             Task { @MainActor in AppModel.shared.refreshSystemState() }
@@ -97,6 +104,8 @@ final class AppModel {
         lockScreenNeedsPassword = settings.lockScreenNeedsPassword
         strictness = settings.strictness
         launchAtLogin = settings.launchAtLogin
+        appLockEnabled = AppLockController.shared.store.enabled
+        appLockApps = AppLockController.shared.store.apps
     }
 
     func refreshSystemState() {
@@ -217,6 +226,49 @@ final class AppModel {
         settings.strictness = value
         reloadSettings()
         restartEngine()
+    }
+
+    // MARK: - App Lock
+
+    func addLockedApp(_ app: InstalledApp) {
+        AppLockController.shared.store.add(bundleID: app.bundleID, name: app.name)
+        reloadSettings()
+    }
+
+    func removeLockedApp(_ bundleID: String) {
+        let controller = AppLockController.shared
+        guard controller.store.enabled else {
+            controller.store.remove(bundleID: bundleID)
+            reloadSettings()
+            return
+        }
+        Task { @MainActor in
+            guard await controller.authorize(reason: "Stop locking this app") else { return }
+            controller.store.remove(bundleID: bundleID)
+            reloadSettings()
+        }
+    }
+
+    func setLockedAppPolicy(_ policy: RelockPolicy, for bundleID: String) {
+        AppLockController.shared.store.setPolicy(policy, for: bundleID)
+        reloadSettings()
+    }
+
+    /// Turning it on is immediate. Turning it off must authenticate first.
+    func setAppLockEnabled(_ enabled: Bool) {
+        let controller = AppLockController.shared
+        if enabled {
+            controller.store.enabled = true
+            controller.start()
+            reloadSettings()
+            return
+        }
+        Task { @MainActor in
+            guard await controller.authorize(reason: "Turn off App Lock") else { return }
+            controller.store.enabled = false
+            controller.stop()
+            reloadSettings()
+        }
     }
 
     func setLaunchAtLogin(_ enabled: Bool) {
