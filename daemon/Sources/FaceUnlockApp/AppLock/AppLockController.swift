@@ -20,6 +20,7 @@ final class AppLockController {
     private var episode: Task<Void, Never>?
     private var activeApp: NSRunningApplication?
     private var queue: [NSRunningApplication] = []
+    private var justActivatedPID: pid_t?
     private var running = false
     private var systemTokens: [NSObjectProtocol] = []
     private var distributedTokens: [NSObjectProtocol] = []
@@ -112,6 +113,7 @@ final class AppLockController {
             guard activeApp?.processIdentifier == app.processIdentifier else { return }
             shield.dismiss()
             app.unhide()
+            justActivatedPID = app.processIdentifier
             app.activate()
             endEpisode()
         case .cancelled:
@@ -145,19 +147,23 @@ final class AppLockController {
     }
 
     private func endEverything() {
+        let hadEpisode = activeApp != nil || episode != nil
         episode?.cancel()
         episode = nil
         activeApp = nil
+        justActivatedPID = nil
         queue.removeAll()
-        NotchOverlayController.shared.cancelScanning()
+        if hadEpisode { NotchOverlayController.shared.cancelScanning() } // the island may belong to a lock-screen scan
         shield.dismiss()
     }
 
     /// The user Cmd-Tabbed to some other app mid-episode: drop the shield so they can use it.
     /// The locked app stays locked (no session) and is hidden; coming back starts a new episode.
     /// Only regular apps count — the system's Touch ID sheet must not abandon the episode.
+    /// The late `didActivate` of the app `finish` just unlocked and activated is skipped once
+    /// (`justActivatedPID`), so it can't kill the next queued episode.
     private func abandonEpisodeIfSwitchedAway(to app: NSRunningApplication) {
-        if let id = app.bundleIdentifier, sessions.isUnlocked(id) { return } // late didActivate of the app we just unlocked
+        if app.processIdentifier == justActivatedPID { justActivatedPID = nil; return }
         guard let locked = activeApp, app.activationPolicy == .regular,
               app.processIdentifier != locked.processIdentifier,
               app.processIdentifier != ProcessInfo.processInfo.processIdentifier else { return }
