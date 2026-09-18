@@ -6,6 +6,7 @@ import FaceUnlockEngine
 private enum SettingsPane: String, CaseIterable, Identifiable {
     case status = "Status"
     case access = "Sudo & Lock Screen"
+    case appLock = "App Lock"
     case face = "Face Data"
     case about = "About"
 
@@ -15,6 +16,7 @@ private enum SettingsPane: String, CaseIterable, Identifiable {
         switch self {
         case .status: return "checkmark.circle.fill"
         case .access: return "lock.fill"
+        case .appLock: return "lock.square.fill"
         case .face: return "faceid"
         case .about: return "info.circle.fill"
         }
@@ -83,6 +85,7 @@ struct SettingsView: View {
                 switch selection.pane {
                 case .status: StatusPane(model: model)
                 case .access: AccessPane(model: model)
+                case .appLock: AppLockPane(model: model)
                 case .face: FacePane(model: model)
                 case .about: AboutPane(model: model)
                 }
