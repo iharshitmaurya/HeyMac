@@ -81,5 +81,12 @@ final class ShieldController {
             panels[id]?.orderOut(nil)
             panels[id] = nil
         }
+        // The content display may have been unplugged; move it to a live one so the
+        // message and buttons stay reachable.
+        if isShowing, model.primaryDisplayID.map({ !seen.contains($0) }) ?? true,
+           let id = NSScreen.main?.displayID ?? seen.first {
+            model.primaryDisplayID = id
+            panels[id]?.makeKey()
+        }
     }
 }
