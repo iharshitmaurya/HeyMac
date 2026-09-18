@@ -25,6 +25,8 @@ cp "$BIN/FaceUnlock" "$APP/Contents/MacOS/FaceUnlock"
 # SwiftPM's resource bundle holds the Core ML models; the app looks for it here.
 cp -R "$BIN/FaceUnlockDaemon_FaceUnlockCore.bundle" "$APP/Contents/Resources/"
 cp -R "$DAEMON_ROOT/Sources/FaceUnlockApp/Animations" "$APP/Contents/Resources/Animations"
+mkdir -p "$APP/Contents/Library/LaunchAgents"
+cp "$SCRIPT_DIR/app/com.faceunlock.app.agent.plist" "$APP/Contents/Library/LaunchAgents/"
 cp "$REPO_ROOT/pam/pam_faceunlock.so" "$APP/Contents/Resources/pam/"
 cp "$REPO_ROOT/pam/scripts/install-pam.sh" "$REPO_ROOT/pam/scripts/uninstall-pam.sh" "$APP/Contents/Resources/pam/"
 sed "s/__VERSION__/$VERSION/g" "$SCRIPT_DIR/app/Info.plist" > "$APP/Contents/Info.plist"

@@ -16,7 +16,8 @@ for path in \
     Contents/Resources/Animations/unsuccessfulunlockanimation.mp4 \
     Contents/Resources/pam/pam_faceunlock.so \
     Contents/Resources/pam/install-pam.sh \
-    Contents/Resources/pam/uninstall-pam.sh
+    Contents/Resources/pam/uninstall-pam.sh \
+    Contents/Library/LaunchAgents/com.faceunlock.app.agent.plist
 do
     [ -e "$APP/$path" ] || fail "missing $path"
 done

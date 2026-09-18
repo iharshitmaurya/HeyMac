@@ -64,6 +64,7 @@ final class AppModel {
             return runtime.verifier(interactive: false, strictness: self.strictness)
         }
         DispatchQueue.main.async { AppLockController.shared.start() }
+        if AppLockController.shared.store.enabled { AppLockAgent.register() }
 
         Timer.scheduledTimer(withTimeInterval: 3, repeats: true) { _ in
             Task { @MainActor in AppModel.shared.refreshSystemState() }
@@ -260,6 +261,7 @@ final class AppModel {
         if enabled {
             controller.store.enabled = true
             controller.start()
+            AppLockAgent.register()
             reloadSettings()
             return
         }
@@ -267,6 +269,7 @@ final class AppModel {
             guard await controller.authorize(reason: "Turn off App Lock") else { reloadSettings(); return }
             controller.store.enabled = false
             controller.stop()
+            AppLockAgent.unregister()
             reloadSettings()
         }
     }
