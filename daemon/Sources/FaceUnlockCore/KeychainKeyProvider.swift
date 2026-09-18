@@ -15,11 +15,11 @@ public enum KeychainKeyProviderError: Error, Equatable {
 /// generic password in the login keychain. The keychain's per-app ACL keeps other apps
 /// from reading it silently.
 ///
-/// `interactive: false` is for the background daemon: it never shows a dialog (a LaunchAgent
-/// blocked on an unseen prompt stops answering sudo and the lock screen) and never creates
+/// `interactive: false` is for background verification: it never shows a dialog (a blocked
+/// unseen prompt would stop the app answering sudo and the lock screen) and never creates
 /// a key (a fresh key would silently orphan the existing encrypted enrollment). Interactive
-/// CLI commands (enroll, set-password, verify) may prompt; choosing "Always Allow" there
-/// authorizes this binary for the daemon too, since both run the same executable.
+/// mode is for user-initiated actions (enroll, save password, Test Now) and may prompt; choosing "Always
+/// Allow" there authorizes this binary for background checks too.
 public final class KeychainKeyProvider: SymmetricKeyProviding {
     private let account: String
     private let interactive: Bool

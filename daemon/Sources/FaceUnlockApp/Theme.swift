@@ -1,19 +1,14 @@
 import SwiftUI
 
-/// Color and shape tokens shared by the menu, settings and wizard — one accent, semantic
-/// status colors, and the radii used everywhere a panel or control is drawn. Matches the
-/// "FaceUnlock, redrawn" interface concept: a single soft blue accent, flat fills, no
-/// gradients or glow shadows.
+/// Color tokens shared by the menu, settings and wizard — one accent and semantic
+/// status colors. Matches the "FaceUnlock, redrawn" interface concept: a single soft blue
+/// accent, flat fills, no gradients or glow shadows.
 enum Theme {
     static let accent = Color(hex: 0x6C93E8)
     static let accentInk = Color(hex: 0x0D1A33)
     static let good = Color(hex: 0x59C77E)
     static let warn = Color(hex: 0xE3A93C)
     static let bad = Color(hex: 0xEF6F5E)
-
-    static let panelRadius: CGFloat = 14
-    static let controlRadius: CGFloat = 10
-    static let rowSpacing: CGFloat = 2
 }
 
 extension Color {

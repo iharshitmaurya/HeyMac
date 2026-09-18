@@ -87,7 +87,7 @@ public final class EngineController: @unchecked Sendable {
             }
             // PAM waits up to 10s: 1s to get the camera if the lock screen holds it, then a
             // 5s window covering camera start-up, exposure warm-up and matching.
-            let outcome = matcher.run(timeout: 5, requiredConsecutive: 2, waitForTurn: 1, keepGoing: { true }, onFrame: nil)
+            let outcome = matcher.run(timeout: 5, requiredConsecutive: 2, waitForTurn: 1, keepGoing: { true })
             record(.sudo(matched: outcome.matched, summary: outcome.summary))
             return outcome.matched ? .ok : .fail
         case .ok, .fail:

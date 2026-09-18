@@ -22,7 +22,7 @@ public struct VerificationOutcome: Equatable, Sendable {
 
 public protocol FaceMatching: AnyObject {
     func run(timeout: TimeInterval, requiredConsecutive: Int, waitForTurn: TimeInterval,
-             keepGoing: () -> Bool, onFrame: ((FrameEvaluation) -> Void)?) -> VerificationOutcome
+             keepGoing: () -> Bool) -> VerificationOutcome
 }
 
 /// Runs a bounded verification window over live camera frames. A match needs
@@ -42,7 +42,7 @@ public final class FaceVerifier: FaceMatching, @unchecked Sendable {
 
     public func run(
         timeout: TimeInterval, requiredConsecutive: Int = 2, waitForTurn: TimeInterval = 0,
-        keepGoing: () -> Bool = { true }, onFrame: ((FrameEvaluation) -> Void)? = nil
+        keepGoing: () -> Bool = { true }
     ) -> VerificationOutcome {
         var outcome = VerificationOutcome()
         guard sessionLock.lock(before: Date().addingTimeInterval(waitForTurn)) else {
@@ -89,7 +89,6 @@ public final class FaceVerifier: FaceMatching, @unchecked Sendable {
                 outcome.framesEvaluated += 1
                 outcome.bestSimilarity = max(outcome.bestSimilarity, evaluation.similarity)
                 outcome.bestLiveness = max(outcome.bestLiveness, evaluation.liveness)
-                onFrame?(evaluation)
                 consecutive = evaluation.accepted ? consecutive + 1 : 0
                 if consecutive >= requiredConsecutive {
                     outcome.matched = true

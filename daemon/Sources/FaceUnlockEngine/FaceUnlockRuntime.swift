@@ -64,15 +64,10 @@ public final class FaceUnlockRuntime: @unchecked Sendable {
         Enroller(frames: camera, sampler: pipeline(interactive: true, strictness: .normal), sessionLock: sessionLock)
     }
 
-    public var isEnrolled: Bool { fileExists(StoredItems.faceCentroid) }
     public var hasLoginPassword: Bool { fileExists(StoredItems.loginPassword) }
 
     public func saveLoginPassword(_ password: String) throws {
         try interactiveStore.save(Data(password.utf8), as: StoredItems.loginPassword)
-    }
-
-    public func removeLoginPassword() throws {
-        try removeFile(StoredItems.loginPassword)
     }
 
     /// Deletes the enrolled face, the stored password and the encryption key.

@@ -138,8 +138,7 @@ public final class LockScreenUnlocker: @unchecked Sendable {
         onEvent(.lockScreenScanning)
         let outcome = matcher.run(
             timeout: 30, requiredConsecutive: 2, waitForTurn: 0,
-            keepGoing: { !self.isStopRequested && !self.settings.paused && self.environment.isLocked() == true && self.environment.displayIsAwake() },
-            onFrame: nil
+            keepGoing: { !self.isStopRequested && !self.settings.paused && self.environment.isLocked() == true && self.environment.displayIsAwake() }
         )
         guard outcome.matched else {
             return outcome.failure.map { report($0) } ?? .noMatch

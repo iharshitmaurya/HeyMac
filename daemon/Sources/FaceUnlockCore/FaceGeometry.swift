@@ -72,15 +72,6 @@ public struct RGBAImage: Sendable {
         return (channel(0), channel(1), channel(2))
     }
 
-    public func makeCGImage() -> CGImage? {
-        guard let provider = CGDataProvider(data: Data(bytes) as CFData) else { return nil }
-        return CGImage(
-            width: width, height: height, bitsPerComponent: 8, bitsPerPixel: 32, bytesPerRow: width * 4,
-            space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedLast.rawValue),
-            provider: provider, decode: nil, shouldInterpolate: false, intent: .defaultIntent
-        )
-    }
-
     /// Core ML image inputs accept 32BGRA buffers; the model's own declared color layout
     /// (RGB for ArcFace, BGR for the anti-spoof model) decides the channel order the
     /// network actually receives, so callers never reorder channels by hand.

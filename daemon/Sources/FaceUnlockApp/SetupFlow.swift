@@ -138,7 +138,7 @@ final class SetupFlow {
         startPreview()
         let verifier = runtime.verifier(interactive: true, strictness: model.strictness)
         DispatchQueue.global(qos: .userInitiated).async {
-            let outcome = verifier.run(timeout: 8, requiredConsecutive: 2, waitForTurn: 1, keepGoing: { true }, onFrame: nil)
+            let outcome = verifier.run(timeout: 8, requiredConsecutive: 2, waitForTurn: 1, keepGoing: { true })
             DispatchQueue.main.async { [self] in
                 testing = false
                 testPassed = outcome.matched
