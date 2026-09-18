@@ -91,6 +91,13 @@ final class NotchOverlayController {
         }
     }
 
+    /// Closes the island quietly when an episode is abandoned before any result (no clip).
+    func cancelScanning() {
+        guard phase == .scanning else { return }
+        resolveTask?.cancel()
+        collapse()
+    }
+
     private func collapse() {
         guard phase != .closed, phase != .collapsing else { return }
         phase = .collapsing

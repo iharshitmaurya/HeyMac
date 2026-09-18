@@ -63,7 +63,7 @@ final class AppModel {
             guard let self, self.setupComplete, !self.paused, let runtime = self.runtime else { return nil }
             return runtime.verifier(interactive: false, strictness: self.strictness)
         }
-        AppLockController.shared.start()
+        DispatchQueue.main.async { AppLockController.shared.start() }
 
         Timer.scheduledTimer(withTimeInterval: 3, repeats: true) { _ in
             Task { @MainActor in AppModel.shared.refreshSystemState() }
@@ -243,7 +243,7 @@ final class AppModel {
             return
         }
         Task { @MainActor in
-            guard await controller.authorize(reason: "Stop locking this app") else { return }
+            guard await controller.authorize(reason: "Stop locking this app") else { reloadSettings(); return }
             controller.store.remove(bundleID: bundleID)
             reloadSettings()
         }
@@ -264,7 +264,7 @@ final class AppModel {
             return
         }
         Task { @MainActor in
-            guard await controller.authorize(reason: "Turn off App Lock") else { return }
+            guard await controller.authorize(reason: "Turn off App Lock") else { reloadSettings(); return }
             controller.store.enabled = false
             controller.stop()
             reloadSettings()

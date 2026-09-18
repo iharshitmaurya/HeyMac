@@ -125,11 +125,15 @@ final class AppLockController {
 
     private func retry() {
         guard let app = activeApp else { return }
+        episode?.cancel()
         startAuthentication(for: app)
     }
 
     private func quitActiveApp() {
+        episode?.cancel()
+        activeApp?.hide() // a save sheet or window must not show once the shield drops
         activeApp?.terminate()
+        NotchOverlayController.shared.cancelScanning()
         shield.dismiss()
         endEpisode()
     }
@@ -145,6 +149,7 @@ final class AppLockController {
         episode = nil
         activeApp = nil
         queue.removeAll()
+        NotchOverlayController.shared.cancelScanning()
         shield.dismiss()
     }
 
@@ -152,10 +157,12 @@ final class AppLockController {
     /// The locked app stays locked (no session) and is hidden; coming back starts a new episode.
     /// Only regular apps count — the system's Touch ID sheet must not abandon the episode.
     private func abandonEpisodeIfSwitchedAway(to app: NSRunningApplication) {
+        if let id = app.bundleIdentifier, sessions.isUnlocked(id) { return } // late didActivate of the app we just unlocked
         guard let locked = activeApp, app.activationPolicy == .regular,
               app.processIdentifier != locked.processIdentifier,
               app.processIdentifier != ProcessInfo.processInfo.processIdentifier else { return }
         episode?.cancel()
+        NotchOverlayController.shared.cancelScanning()
         shield.dismiss()
         locked.hide()
         endEpisode()
@@ -166,6 +173,7 @@ final class AppLockController {
         queue.removeAll { $0.processIdentifier == app.processIdentifier }
         if activeApp?.processIdentifier == app.processIdentifier {
             episode?.cancel()
+            NotchOverlayController.shared.cancelScanning()
             shield.dismiss()
             endEpisode()
         }
@@ -203,6 +211,7 @@ final class AppLockController {
 
     private func revokeAll() {
         sessions.revokeAll()
+        activeApp?.hide()
         endEverything()
     }
 }
