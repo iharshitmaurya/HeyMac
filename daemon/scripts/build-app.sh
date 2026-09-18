@@ -12,7 +12,7 @@ APP="$DIST/FaceUnlock.app"
 source "$SCRIPT_DIR/lib-signing.sh"
 
 echo "Building executables (release)..."
-(cd "$DAEMON_ROOT" && swift build -c release --product FaceUnlock && swift build -c release --product faceunlockd)
+(cd "$DAEMON_ROOT" && swift build -c release --product FaceUnlock)
 BIN="$(cd "$DAEMON_ROOT" && swift build -c release --show-bin-path)"
 
 echo "Building the sudo PAM module..."
@@ -22,9 +22,9 @@ echo "Assembling $APP..."
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources/pam"
 cp "$BIN/FaceUnlock" "$APP/Contents/MacOS/FaceUnlock"
-cp "$BIN/faceunlockd" "$APP/Contents/MacOS/faceunlockd"
 # SwiftPM's resource bundle holds the Core ML models; the app looks for it here.
 cp -R "$BIN/FaceUnlockDaemon_FaceUnlockCore.bundle" "$APP/Contents/Resources/"
+cp -R "$DAEMON_ROOT/Sources/FaceUnlockApp/Animations" "$APP/Contents/Resources/Animations"
 cp "$REPO_ROOT/pam/pam_faceunlock.so" "$APP/Contents/Resources/pam/"
 cp "$REPO_ROOT/pam/scripts/install-pam.sh" "$REPO_ROOT/pam/scripts/uninstall-pam.sh" "$APP/Contents/Resources/pam/"
 sed "s/__VERSION__/$VERSION/g" "$SCRIPT_DIR/app/Info.plist" > "$APP/Contents/Info.plist"
@@ -41,7 +41,6 @@ fi
 
 echo "Signing..."
 sign_code "$APP/Contents/Resources/pam/pam_faceunlock.so" com.faceunlock.pam
-sign_code "$APP/Contents/MacOS/faceunlockd" com.faceunlock.cli
 sign_code "$APP" com.faceunlock.app
 codesign --verify --deep --strict "$APP"
 if ! signing_identity_available; then

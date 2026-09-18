@@ -9,9 +9,11 @@ fail() { echo "FAIL: $*" >&2; exit 1; }
 [ -d "$APP" ] || fail "no app at $APP"
 for path in \
     Contents/MacOS/FaceUnlock \
-    Contents/MacOS/faceunlockd \
     Contents/Info.plist \
     Contents/Resources/FaceUnlockDaemon_FaceUnlockCore.bundle \
+    Contents/Resources/Animations/unlockstatic.png \
+    Contents/Resources/Animations/unlockanimation.mp4 \
+    Contents/Resources/Animations/unsuccessfulunlockanimation.mp4 \
     Contents/Resources/pam/pam_faceunlock.so \
     Contents/Resources/pam/install-pam.sh \
     Contents/Resources/pam/uninstall-pam.sh
@@ -27,6 +29,5 @@ bash -n "$APP/Contents/Resources/pam/install-pam.sh" || fail "install-pam.sh is 
 bash -n "$APP/Contents/Resources/pam/uninstall-pam.sh" || fail "uninstall-pam.sh is not valid shell"
 
 "$APP/Contents/MacOS/FaceUnlock" --self-check || fail "self-check failed"
-"$APP/Contents/MacOS/faceunlockd" --help >/dev/null || fail "the bundled CLI does not run"
 
 echo "OK: $APP"

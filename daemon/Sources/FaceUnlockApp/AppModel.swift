@@ -28,6 +28,7 @@ final class AppModel {
     private(set) var lockScreenNeedsPassword = false
     private(set) var strictness: MatchStrictness = .normal
     private(set) var launchAtLogin = true
+    private(set) var animationStyle = UnlockAnimationStyle.saved
     private(set) var pamStatus: PamStatus = .notInstalled
     private(set) var accessibilityTrusted = false
     private(set) var cameraAuthorized = false
@@ -66,14 +67,6 @@ final class AppModel {
     }
 
     // MARK: - Derived state
-
-    var statusLine: String {
-        if let startupError { return startupError }
-        if !setupComplete { return "FaceUnlock: not set up yet" }
-        if paused { return "FaceUnlock: paused" }
-        if !sudoEnabled && !lockScreenEnabled { return "FaceUnlock: nothing turned on" }
-        return "FaceUnlock: on · \(lastEvent)"
-    }
 
     var problems: [String] {
         var found: [String] = []
@@ -153,7 +146,7 @@ final class AppModel {
         case .lockScreenProblem(let reason):
             lastEvent = reason
         }
-        LockScreenOverlay.shared.handle(event)
+        NotchOverlayController.shared.handle(event)
     }
 
     private func countUnlock() {
@@ -211,6 +204,13 @@ final class AppModel {
         settings.paused = paused
         reloadSettings()
         log.write(paused ? "paused" : "resumed")
+    }
+
+    /// Saves the choice and plays it on the desktop so it can be judged without locking the screen.
+    func setAnimationStyle(_ style: UnlockAnimationStyle) {
+        UnlockAnimationStyle.saved = style
+        animationStyle = style
+        NotchOverlayController.shared.preview(style)
     }
 
     func setStrictness(_ value: MatchStrictness) {

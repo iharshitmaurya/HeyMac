@@ -182,6 +182,19 @@ private struct AccessPane: View {
             Text("Stricter means fewer false matches, but it may not recognize you in poor light.")
                 .font(.system(size: 11.5)).foregroundStyle(.secondary)
         }
+
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Unlock animation").font(.system(size: 13, weight: .semibold))
+            Picker("", selection: Binding(get: { model.animationStyle }, set: { model.setAnimationStyle($0) })) {
+                ForEach(UnlockAnimationStyle.allCases) { style in
+                    Text(style.title).tag(style)
+                }
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            Text("Minimal widens the notch just enough for a lock and a small animation. Original opens a large panel. Picking one plays a preview.")
+                .font(.system(size: 11.5)).foregroundStyle(.secondary)
+        }
     }
 
     private var sudoChip: StatusChip {
@@ -260,7 +273,6 @@ private struct AboutPane: View {
                 Text("Version 1.0.0").font(.system(size: 11.5, design: .monospaced)).foregroundStyle(.secondary)
             }
         }
-        Button("Check for Updates") {}.buttonStyle(PillButtonStyle(kind: .secondary))
         Text("Face embedding: ArcFace (w600k_mbf), MIT. Liveness: MiniFASNetV2, minivision-ai/Silent-Face-Anti-Spoofing, Apache-2.0. Both run on-device — nothing is ever uploaded.")
             .font(.system(size: 11)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
     }

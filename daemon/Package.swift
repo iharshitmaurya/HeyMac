@@ -5,9 +5,6 @@ let package = Package(
     name: "FaceUnlockDaemon",
     platforms: [.macOS(.v14)],
     products: [
-        .library(name: "FaceUnlockCore", targets: ["FaceUnlockCore"]),
-        .library(name: "FaceUnlockEngine", targets: ["FaceUnlockEngine"]),
-        .executable(name: "faceunlockd", targets: ["FaceUnlockDaemon"]),
         .executable(name: "FaceUnlock", targets: ["FaceUnlockApp"]),
     ],
     targets: [
@@ -26,21 +23,9 @@ let package = Package(
             swiftSettings: [.swiftLanguageMode(.v5)]
         ),
         .executableTarget(
-            name: "FaceUnlockDaemon",
-            dependencies: ["FaceUnlockCore", "FaceUnlockEngine"],
-            exclude: ["Info.plist"],
-            linkerSettings: [
-                .unsafeFlags([
-                    "-Xlinker", "-sectcreate",
-                    "-Xlinker", "__TEXT",
-                    "-Xlinker", "__info_plist",
-                    "-Xlinker", "Sources/FaceUnlockDaemon/Info.plist",
-                ])
-            ]
-        ),
-        .executableTarget(
             name: "FaceUnlockApp",
             dependencies: ["FaceUnlockCore", "FaceUnlockEngine"],
+            exclude: ["Animations"],
             swiftSettings: [.swiftLanguageMode(.v5)]
         ),
         .testTarget(
