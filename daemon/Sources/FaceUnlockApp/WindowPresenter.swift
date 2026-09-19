@@ -8,7 +8,8 @@ import SwiftUI
 final class WindowPresenter {
     private var windows: [String: NSWindow] = [:]
 
-    func show<Content: View>(id: String, title: String, size: CGSize, @ViewBuilder content: () -> Content) {
+    func show<Content: View>(id: String, title: String, size: CGSize, resizable: Bool = false, minSize: CGSize? = nil,
+                              autosaveName: String? = nil, @ViewBuilder content: () -> Content) {
         if let existing = windows[id] {
             existing.makeKeyAndOrderFront(nil)
             NSApp.activate(ignoringOtherApps: true)
@@ -16,13 +17,15 @@ final class WindowPresenter {
         }
         let window = NSWindow(
             contentRect: NSRect(origin: .zero, size: size),
-            styleMask: [.titled, .closable, .miniaturizable],
+            styleMask: resizable ? [.titled, .closable, .miniaturizable, .resizable] : [.titled, .closable, .miniaturizable],
             backing: .buffered, defer: false
         )
         window.title = title
         window.isReleasedWhenClosed = false
         window.contentView = NSHostingView(rootView: content())
+        if let minSize { window.contentMinSize = minSize }
         window.center()
+        if let autosaveName { window.setFrameAutosaveName(autosaveName) } // restores a saved frame over the centered default
         windows[id] = window
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)

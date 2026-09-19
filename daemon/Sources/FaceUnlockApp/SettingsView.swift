@@ -50,7 +50,7 @@ struct SettingsView: View {
             Divider()
             content
         }
-        .frame(width: 560, height: 460)
+        .frame(minWidth: 640, maxWidth: .infinity, minHeight: 480, maxHeight: .infinity)
     }
 
     private var sidebar: some View {

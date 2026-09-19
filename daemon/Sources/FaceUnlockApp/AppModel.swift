@@ -394,7 +394,8 @@ final class AppModel {
     }
 
     func openSettings() {
-        windows.show(id: "settings", title: "FaceUnlock Settings", size: CGSize(width: 560, height: 460)) {
+        windows.show(id: "settings", title: "FaceUnlock Settings", size: CGSize(width: 720, height: 560),
+                     resizable: true, minSize: CGSize(width: 640, height: 480), autosaveName: "FaceUnlockSettings") {
             SettingsView(model: self)
         }
     }

@@ -24,7 +24,7 @@ enum UISnapshot {
         let model = AppModel.shared
 
         let paneNames = ["status", "access", "applock", "face", "about"]
-        let settingsSizes = [(560, 460), (680, 520), (820, 620), (1000, 760)]
+        let settingsSizes = [(640, 480), (680, 520), (820, 620), (1000, 760)]
         for (i, pane) in paneNames.enumerated() {
             for (w, h) in settingsSizes {
                 each { SettingsView(model: model, initialPaneIndex: i) }
