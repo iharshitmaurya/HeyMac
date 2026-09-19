@@ -44,10 +44,7 @@ struct MenuContent: View {
             toggleRow("Pause", icon: "pause.circle", isOn: paused) { model.setPaused($0) }
                 .disabled(!model.setupComplete)
             divider
-            if model.setupComplete {
-                actionRow("Test Now…", icon: "bolt.fill", shortcut: "⌘T") { model.openTest() }
-                actionRow("Re-enroll My Face…", icon: "arrow.triangle.2.circlepath", shortcut: nil) { model.reEnroll() }
-            } else {
+            if !model.setupComplete {
                 actionRow("Set Up FaceUnlock…", icon: "person.crop.circle.badge.plus", shortcut: nil) { model.openSetup() }
             }
             actionRow("Settings…", icon: "gearshape", shortcut: "⌘,") { model.openSettings() }

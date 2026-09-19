@@ -271,6 +271,7 @@ private struct FacePane: View {
     }
 
     @ViewBuilder private var buttons: some View {
+        Button("Test Now…") { model.openTest() }.buttonStyle(PillButtonStyle(kind: .secondary))
         Button("Re-enroll My Face…") { model.reEnroll() }.buttonStyle(PillButtonStyle(kind: .secondary))
         Button("Remove My Face Data…") { confirmRemoval() }.buttonStyle(PillButtonStyle(kind: .danger))
     }
