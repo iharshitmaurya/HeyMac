@@ -4,7 +4,7 @@ Usage:
   git clone https://github.com/minivision-ai/Silent-Face-Anti-Spoofing
   pip install torch coremltools opencv-python-headless==4.10.0.84 pillow
   cd Silent-Face-Anti-Spoofing && python /path/to/convert_antispoof.py OUT.mlpackage
-  # then replace daemon/Sources/FaceUnlockCore/Resources/AntiSpoof.mlpkgdata with OUT.mlpackage
+  # then replace Sources/FaceUnlockCore/Resources/AntiSpoof.mlpkgdata with OUT.mlpackage
 
 Preprocessing facts this relies on (from upstream source, not its docstrings):
   - src/data_io/functional.py to_tensor does NOT divide by 255 -> scale=1.0

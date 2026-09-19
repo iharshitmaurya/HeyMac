@@ -1,4 +1,4 @@
-// Throwaway spike. Run: swift daemon/scripts/spike/focus-spike.swift activating|nonactivating
+// Throwaway spike. Run: swift tools/spike/focus-spike.swift activating|nonactivating
 // Shows an opaque .mainMenu+2 panel, then calls LAContext. Observe whether the Touch ID /
 // password sheet appears on top, takes input, and whether typing reaches the app behind.
 import AppKit
