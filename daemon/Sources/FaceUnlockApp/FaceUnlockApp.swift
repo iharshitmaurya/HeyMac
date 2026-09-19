@@ -14,6 +14,16 @@ struct FaceUnlockApp: App {
             print(problems.isEmpty ? "self-check passed" : "self-check failed (\(problems.count) problems)")
             exit(problems.isEmpty ? 0 : 1)
         }
+        if let flag = CommandLine.arguments.firstIndex(of: "--render-ui") {
+            // QA harness: render the real screens to PNG with sample state, then exit. Runs before
+            // the single-instance guard and before anything touches AppModel.shared.
+            guard CommandLine.arguments.count > flag + 1 else {
+                FileHandle.standardError.write(Data("usage: FaceUnlock --render-ui <outputDir>\n".utf8))
+                exit(2)
+            }
+            let dir = CommandLine.arguments[flag + 1]
+            MainActor.assumeIsolated { UISnapshot.run(outputDir: dir) }
+        }
         // The launch agent and the login item can both start us; only one copy may run, and the
         // lowest pid keeps running so two simultaneous starts can never both yield. A duplicate
         // exits NON-zero: launchd only restarts a KeepAlive/SuccessfulExit=false job on failure, so

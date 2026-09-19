@@ -184,3 +184,11 @@ private func icon(for bundleID: String) -> NSImage {
     }
     return NSWorkspace.shared.icon(forFile: url.path)
 }
+
+/// Snapshot-only: the "Add App" sheet content with a fixed list (read-only scan of /System/Applications).
+@MainActor
+func snapshotAppPickerSheet(model: AppModel) -> some View {
+    let state = PickerState()
+    state.installed = InstalledApps.scan(roots: [URL(fileURLWithPath: "/System/Applications")])
+    return AppPickerSheet(model: model, picker: state)
+}

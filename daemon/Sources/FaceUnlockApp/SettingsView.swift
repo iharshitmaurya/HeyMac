@@ -38,6 +38,12 @@ struct SettingsView: View {
     let model: AppModel
     private let selection = SettingsSelection()
 
+    /// `initialPaneIndex` (index into the sidebar order) is a snapshot-only hook; the app uses the default.
+    init(model: AppModel, initialPaneIndex: Int = 0) {
+        self.model = model
+        selection.pane = SettingsPane.allCases[initialPaneIndex]
+    }
+
     var body: some View {
         HStack(spacing: 0) {
             sidebar

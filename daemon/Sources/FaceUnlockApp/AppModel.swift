@@ -12,6 +12,8 @@ import FaceUnlockEngine
 @MainActor
 @Observable
 final class AppModel {
+    /// Set by `--render-ui` before first access: the model then holds fixed sample state and has no side effects.
+    nonisolated(unsafe) static var uiSnapshotMode = false
     static let shared = AppModel()
 
     let settings = EngineSettings()
@@ -45,6 +47,20 @@ final class AppModel {
     private init() {
         let resources = (Bundle.main.resourceURL ?? Bundle.main.bundleURL).appendingPathComponent("pam")
         pam = PamInstaller(resourcesDirectory: resources)
+
+        if Self.uiSnapshotMode {
+            // Deterministic sample state for the QA renderer; no runtime, engine, agent, timer or window.
+            let sample = #"[{"bundleID":"net.whatsapp.WhatsApp","name":"\u200EWhatsApp","policy":{"everyTime":{}}},{"bundleID":"com.brave.Browser","name":"Brave Browser","policy":{"afterMinutes":{"_0":5}}},{"bundleID":"com.microsoft.Powerpoint","name":"Microsoft PowerPoint Insider Preview Edition","policy":{"afterFocusLossMinutes":{"_0":5}}},{"bundleID":"com.apple.Notes","name":"Notes","policy":{"afterMinutes":{"_0":15}}}]"#
+            appLockApps = (try? JSONDecoder().decode([LockedApp].self, from: Data(sample.utf8))) ?? []
+            setupComplete = true; sudoEnabled = true; lockScreenEnabled = true; paused = false
+            strictness = .normal; unlocksToday = 42; launchAtLogin = true
+            accessibilityTrusted = true; cameraAuthorized = true; appLockEnabled = true
+            pamStatus = .installed
+            animationStyle = .minimal
+            shieldMode = .fullScreen
+            lastEvent = "sudo unlocked 9:41 AM"
+            return
+        }
 
         if LegacyAgentMigration.migrateIfNeeded() {
             log.write("removed the old faceunlockd LaunchAgent (the app replaces it)")

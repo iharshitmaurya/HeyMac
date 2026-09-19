@@ -8,7 +8,8 @@ enum AppLockAgent {
     private static var service: SMAppService { .agent(plistName: "com.faceunlock.app.agent.plist") }
 
     static var statusText: String {
-        switch service.status {
+        if AppModel.uiSnapshotMode { return "Relaunch protection is active" } // --render-ui: no SMAppService query
+        return switch service.status {
         case .enabled: "Relaunch protection is active"
         case .requiresApproval: "Relaunch protection needs approval in System Settings > Login Items"
         case .notRegistered: "Relaunch protection is not registered"
