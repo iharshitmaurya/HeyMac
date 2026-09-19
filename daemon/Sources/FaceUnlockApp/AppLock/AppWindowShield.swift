@@ -84,15 +84,22 @@ final class AppWindowShield {
     init(model: ShieldModel) { self.model = model }
 
     func present(pid: pid_t) {
+        guard pid > 0, pid != ProcessInfo.processInfo.processIdentifier else { return }
         self.pid = pid
         generation += 1
         isShowing = true
         lastCount = 0
-        for panel in pool.values { panel.alphaValue = 1 }
+        // Reset through the animator with zero duration so a still-running dismiss fade is
+        // cancelled; setting alphaValue directly would be overwritten when it lands on 0.
+        NSAnimationContext.runAnimationGroup { ctx in
+            ctx.duration = 0
+            for panel in pool.values { panel.animator().alphaValue = 1 }
+        }
         timer?.invalidate()
         tick()
-        let t = Timer(timeInterval: Self.pollInterval, repeats: true) { [weak self] _ in
-            MainActor.assumeIsolated { self?.tick() }
+        let t = Timer(timeInterval: Self.pollInterval, repeats: true) { [weak self] timer in
+            guard let self else { timer.invalidate(); return }
+            MainActor.assumeIsolated { self.tick() }
         }
         RunLoop.main.add(t, forMode: .common)
         timer = t
@@ -127,7 +134,10 @@ final class AppWindowShield {
             live.insert(win.number)
             let panel = pool[win.number] ?? BlurPanel(model: model)
             pool[win.number] = panel
-            let level = NSWindow.Level(rawValue: win.layer)
+            // Clamped to just above the menu bar so the notch island (.mainMenu + 3) always stays
+            // on top. Consequence (documented limitation): windows of the locked app above this
+            // level (pop-up menus, some HUDs) are not covered.
+            let level = NSWindow.Level(rawValue: min(win.layer, NSWindow.Level.mainMenu.rawValue + 1))
             if panel.level != level { panel.level = level }
             if panel.frame != win.frame { panel.setFrame(win.frame, display: false) }
             panel.order(.above, relativeTo: Int(win.number))
@@ -137,13 +147,24 @@ final class AppWindowShield {
             pool[number] = nil
         }
         // The text lives on the panel over the largest window; only that panel can become key.
-        let largest = wins.max { $0.frame.width * $0.frame.height < $1.frame.width * $1.frame.height }?.number
+        // Hysteresis: keep the current one unless another window is strictly larger (ties: lowest number).
+        func area(_ w: TrackedWindow) -> CGFloat { w.frame.width * w.frame.height }
+        let maxArea = wins.map(area).max() ?? 0
+        var largest: CGWindowID?
+        if let cur = contentWindow, let w = wins.first(where: { $0.number == cur }), area(w) >= maxArea {
+            largest = cur
+        } else {
+            largest = wins.filter { area($0) == maxArea }.map(\.number).min()
+        }
         if largest != contentWindow {
-            if let old = contentWindow { pool[old]?.setHostsContent(false) }
+            if let old = contentWindow, let p = pool[old] {
+                p.setHostsContent(false)
+                if p.isKeyWindow { p.resignKey() }
+            }
             contentWindow = largest
             if let n = largest, let p = pool[n] {
                 p.setHostsContent(true)
-                p.makeKey()
+                if NSApp.isActive { p.makeKey() }
             }
         }
         if wins.count != lastCount {
