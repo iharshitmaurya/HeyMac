@@ -7,6 +7,16 @@ import ServiceManagement
 enum AppLockAgent {
     private static var service: SMAppService { .agent(plistName: "com.faceunlock.app.agent.plist") }
 
+    static var statusText: String {
+        switch service.status {
+        case .enabled: "Relaunch protection is active"
+        case .requiresApproval: "Relaunch protection needs approval in System Settings > Login Items"
+        case .notRegistered: "Relaunch protection is not registered"
+        case .notFound: "Relaunch protection is unavailable in this build"
+        @unknown default: "Relaunch protection status unknown"
+        }
+    }
+
     static func register() {
         guard service.status != .enabled else { return }
         do { try service.register() } catch { AppLog.shared.write("App Lock agent register failed: \(error)") }

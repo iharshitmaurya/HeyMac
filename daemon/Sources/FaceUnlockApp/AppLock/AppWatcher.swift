@@ -9,6 +9,7 @@ final class AppWatcher {
     var onCandidate: (NSRunningApplication) -> Void = { _ in }
     var onActivate: (NSRunningApplication) -> Void = { _ in }
     var onDeactivate: (NSRunningApplication) -> Void = { _ in }
+    var onBackgroundLocked: (NSRunningApplication) -> Void = { _ in }
     var onTerminate: (NSRunningApplication) -> Void = { _ in }
 
     private var tokens: [NSObjectProtocol] = []
@@ -56,7 +57,14 @@ final class AppWatcher {
     }
 
     private func reconcile() {
-        if let front = NSWorkspace.shared.frontmostApplication { consider(front) }
+        let front = NSWorkspace.shared.frontmostApplication
+        if let front { consider(front) }
+        let me = ProcessInfo.processInfo.processIdentifier
+        for app in NSWorkspace.shared.runningApplications {
+            guard let id = app.bundleIdentifier, isLocked(id), app.activationPolicy == .regular, !app.isTerminated,
+                  app.processIdentifier != front?.processIdentifier, app.processIdentifier != me else { continue }
+            onBackgroundLocked(app)
+        }
     }
 
     private func consider(_ app: NSRunningApplication) {

@@ -10,7 +10,8 @@ final class AppLockController {
     let store = LockedAppStore()
     /// Supplied by `AppModel`; nil when face unlock isn't set up, paused, or the models failed to load.
     var faceMatcher: () -> FaceMatching? = { nil }
-    /// Set only for an authorized quit (or logout), so `applicationShouldTerminate` lets it through.
+    /// Set only by `AppDelegate` after a successful `authorize`, so `applicationShouldTerminate` lets that
+    /// one quit through. Logout/shutdown/restart get the normal authenticated quit prompt.
     var quitAuthorized = false
 
     private let sessions = SessionBook()
@@ -42,6 +43,10 @@ final class AppLockController {
         watcher.onDeactivate = { [weak self] app in
             if let id = app.bundleIdentifier { self?.sessions.focusLost(id) }
         }
+        watcher.onBackgroundLocked = { [weak self] app in
+            guard let self, let id = app.bundleIdentifier, !self.sessions.isUnlocked(id), !app.isHidden else { return }
+            app.hide()
+        }
         watcher.onTerminate = { [weak self] app in self?.handleTerminate(app) }
         watcher.start()
         observeSystemEvents()
@@ -50,6 +55,7 @@ final class AppLockController {
     func stop() {
         guard running else { return }
         running = false
+        quitAuthorized = false
         watcher.stop()
         endEverything()
         sessions.revokeAll()
@@ -61,7 +67,9 @@ final class AppLockController {
     }
 
     /// The same auth chain used for unlocking apps, for guarding quit and disabling protection.
+    /// Quitting/disabling while a shield episode is active is denied; finish or "Quit App" first.
     func authorize(reason: String) async -> Bool {
+        if activeApp != nil { return false }
         let outcome = await makeCoordinator().run(reason: reason)
         if case .unlocked = outcome { return true }
         return false
@@ -205,13 +213,6 @@ final class AppLockController {
                 MainActor.assumeIsolated { self?.revokeAll() }
             })
         }
-        systemTokens.append(center.addObserver(forName: NSWorkspace.willPowerOffNotification, object: nil, queue: .main) { [weak self] _ in
-            MainActor.assumeIsolated { self?.quitAuthorized = true } // never hang a shutdown on a prompt
-            // A cancelled or vetoed logout must not leave quit protection off; a completed one kills us first.
-            DispatchQueue.main.asyncAfter(deadline: .now() + 60) {
-                MainActor.assumeIsolated { self?.quitAuthorized = false }
-            }
-        })
         distributedTokens.append(DistributedNotificationCenter.default().addObserver(
             forName: Notification.Name("com.apple.screenIsLocked"), object: nil, queue: .main
         ) { [weak self] _ in

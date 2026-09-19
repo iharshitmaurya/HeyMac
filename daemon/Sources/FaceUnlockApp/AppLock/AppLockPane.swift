@@ -39,6 +39,10 @@ struct AppLockPane: View {
         .background(Color.primary.opacity(0.05))
         .clipShape(RoundedRectangle(cornerRadius: 12))
 
+        if model.appLockEnabled {
+            Text(AppLockAgent.statusText).font(.system(size: 11.5)).foregroundStyle(.secondary)
+        }
+
         if model.appLockApps.isEmpty {
             Text("No apps locked yet.").font(.system(size: 12)).foregroundStyle(.secondary)
         } else {

@@ -64,7 +64,7 @@ final class AppModel {
             return runtime.verifier(interactive: false, strictness: self.strictness)
         }
         DispatchQueue.main.async { AppLockController.shared.start() }
-        if AppLockController.shared.store.enabled { AppLockAgent.register() }
+        if AppLockController.shared.store.enabled && setupComplete { AppLockAgent.register() }
 
         Timer.scheduledTimer(withTimeInterval: 3, repeats: true) { _ in
             Task { @MainActor in AppModel.shared.refreshSystemState() }
