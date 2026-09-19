@@ -40,7 +40,8 @@ struct FormRow<Trailing: View>: View {
     var body: some View {
         ViewThatFits(in: .horizontal) {
             HStack(alignment: .center, spacing: Spacing.md) {
-                labels.layoutPriority(1)
+                // ideal width 200: a long caption wraps instead of forcing the stacked fallback
+                labels.frame(idealWidth: 200, maxWidth: .infinity, alignment: .leading).layoutPriority(1)
                 Spacer(minLength: Spacing.sm)
                 trailing().fixedSize()
             }
@@ -48,6 +49,7 @@ struct FormRow<Trailing: View>: View {
                 labels
                 trailing().fixedSize(horizontal: false, vertical: true)
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(.horizontal, Surface.rowInset)
         .padding(.vertical, Spacing.md)

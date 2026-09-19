@@ -23,84 +23,131 @@ struct AppLockPane: View {
     private let picker = PickerState()
 
     var body: some View {
-        Text("App Lock").font(.system(size: 15.5, weight: .bold))
+        PaneTitle("App Lock")
 
-        HStack {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Lock selected apps with my face").font(.system(size: 13, weight: .semibold))
-                Text("Turning this off asks for your face, Touch ID or password first.")
-                    .font(.system(size: 11.5)).foregroundStyle(.secondary)
+        SettingsCard {
+            FormRow(title: "Lock selected apps",
+                    caption: "Turning this off asks for your face, Touch ID or password first.") {
+                Toggle("Lock selected apps", isOn: Binding(get: { model.appLockEnabled }, set: { model.setAppLockEnabled($0) }))
+                    .labelsHidden().toggleStyle(.switch).tint(Theme.accent)
             }
-            Spacer()
-            Toggle("", isOn: Binding(get: { model.appLockEnabled }, set: { model.setAppLockEnabled($0) }))
-                .labelsHidden().tint(Theme.accent)
-        }
-        .padding(.horizontal, 14).padding(.vertical, 12)
-        .background(Color.primary.opacity(0.05))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-
-        VStack(alignment: .leading, spacing: 6) {
-            HStack {
-                Text("Shield style").font(.system(size: 13, weight: .semibold))
-                Spacer()
-                Picker("", selection: Binding(get: { model.shieldMode }, set: { model.setShieldMode($0) })) {
-                    ForEach(ShieldMode.allCases) { Text($0.title).tag($0) }
-                }
-                .labelsHidden().pickerStyle(.segmented).frame(width: 260)
+            if model.appLockEnabled {
+                RowDivider()
+                FormRow(title: "Relaunch protection", caption: AppLockAgent.statusText) { relaunchChip }
             }
-            Text("Only the locked app blurs just that app's windows. It can lag slightly if you drag the window, and a new window may show for an instant before it is covered. Whole screen is the strongest.")
-                .font(.system(size: 11.5)).foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .padding(.horizontal, 14).padding(.vertical, 12)
-        .background(Color.primary.opacity(0.05))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-
-        if model.appLockEnabled {
-            Text(AppLockAgent.statusText).font(.system(size: 11.5)).foregroundStyle(.secondary)
         }
 
-        if model.appLockApps.isEmpty {
-            Text("No apps locked yet.").font(.system(size: 12)).foregroundStyle(.secondary)
-        } else {
-            VStack(spacing: 0) {
-                ForEach(model.appLockApps) { app in
-                    lockedRow(app)
-                    if app.id != model.appLockApps.last?.id { Divider().padding(.leading, 12) }
+        PaneSection {
+            HStack(alignment: .firstTextBaseline) {
+                SectionHeader("Locked apps")
+                Spacer(minLength: Spacing.sm)
+                if !model.appLockApps.isEmpty { addButton }
+            }
+            if model.appLockApps.isEmpty {
+                SettingsCard { emptyState }
+            } else {
+                SettingsCard {
+                    ForEach(model.appLockApps) { app in
+                        lockedRow(app)
+                        if app.id != model.appLockApps.last?.id { RowDivider(inset: Surface.rowInset + IconSize.app + Spacing.md) }
+                    }
                 }
             }
-            .background(Color.primary.opacity(0.05))
-            .clipShape(RoundedRectangle(cornerRadius: 12))
+        }
+        .sheet(isPresented: Binding(get: { picker.isOpen }, set: { picker.isOpen = $0 })) {
+            AppPickerSheet(model: model, picker: picker)
         }
 
+        PaneSection(header: "Shield style") {
+            SettingsCard {
+                VStack(alignment: .leading, spacing: Spacing.md) {
+                    Picker("Shield style", selection: Binding(get: { model.shieldMode }, set: { model.setShieldMode($0) })) {
+                        ForEach(ShieldMode.allCases) { Text($0.title).tag($0) }
+                    }
+                    .labelsHidden().pickerStyle(.segmented).frame(maxWidth: .infinity)
+                    CaptionText(shieldCaption)
+                }
+                .padding(Spacing.lg)
+            }
+        }
+
+        CaptionText("App Lock is a convenience, not a security boundary — quitting FaceUnlock from Activity Monitor bypasses it, and notification previews may still appear.")
+    }
+
+    private var shieldCaption: String {
+        switch model.shieldMode {
+        case .fullScreen:
+            return "Covers every display until you unlock; the strongest option."
+        case .appWindowsOnly:
+            return "Blurs just that app's windows and leaves other apps usable. It can lag slightly when you drag the window, and a new window may show for an instant."
+        }
+    }
+
+    private var addButton: some View {
         Button("Add App…") { picker.open() }.buttonStyle(PillButtonStyle(kind: .secondary))
-            .sheet(isPresented: Binding(get: { picker.isOpen }, set: { picker.isOpen = $0 })) {
-                AppPickerSheet(model: model, picker: picker)
-            }
+    }
 
-        Text("App Lock is a convenience, not a security boundary. Someone who can quit FaceUnlock from Activity Monitor can bypass it, and notification previews from locked apps may still appear.")
-            .font(.system(size: 11.5)).foregroundStyle(.secondary)
-            .fixedSize(horizontal: false, vertical: true)
+    private var emptyState: some View {
+        VStack(spacing: Spacing.sm) {
+            Image(systemName: "lock.square").font(.system(size: 28)).foregroundStyle(.secondary).accessibilityHidden(true)
+            Text("No locked apps yet").font(Typography.rowTitle)
+            CaptionText("Choose an app to protect with your face.").multilineTextAlignment(.center)
+            addButton.padding(.top, Spacing.xs)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, Spacing.xl).padding(.horizontal, Spacing.lg)
+    }
+
+    private var relaunchChip: StatusChip {
+        let text = AppLockAgent.statusText
+        if text.hasSuffix("is active") { return StatusChip(text: "Active", tone: .good) }
+        if text.contains("needs approval") { return StatusChip(text: "Needs approval", tone: .warn) }
+        return StatusChip(text: "Off", tone: .warn)
     }
 
     private func lockedRow(_ app: LockedApp) -> some View {
-        HStack(spacing: 10) {
-            Image(nsImage: icon(for: app.bundleID)).resizable().frame(width: 26, height: 26)
-            Text(app.name).font(.system(size: 13, weight: .semibold))
-            Spacer()
-            Picker("", selection: Binding(
-                get: { PolicyChoice(app.policy) },
-                set: { model.setLockedAppPolicy($0.policy, for: app.bundleID) }
-            )) {
-                ForEach(PolicyChoice.allCases) { Text($0.title).tag($0) }
-            }
-            .labelsHidden().frame(width: 190)
-            Button {
-                model.removeLockedApp(app.bundleID)
-            } label: { Image(systemName: "minus.circle.fill") }
-            .buttonStyle(.plain).foregroundStyle(.secondary)
+        let policy = Picker("Relock policy for \(app.name)", selection: Binding(
+            get: { PolicyChoice(app.policy) },
+            set: { model.setLockedAppPolicy($0.policy, for: app.bundleID) }
+        )) {
+            ForEach(PolicyChoice.allCases) { Text($0.title).tag($0) }
         }
-        .padding(.horizontal, 14).padding(.vertical, 8)
+        .labelsHidden().pickerStyle(.menu)
+        .frame(minWidth: 150, idealWidth: 190, maxWidth: 190)
+
+        let remove = Button { model.removeLockedApp(app.bundleID) } label: {
+            Image(systemName: "minus.circle.fill").font(.title3)
+                .foregroundStyle(.secondary)
+                .frame(width: 24, height: 24).contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Remove \(app.name) from App Lock")
+        .help("Remove \(app.name) from App Lock")
+
+        let name = Text(app.name).font(Typography.rowTitle)
+            .lineLimit(1).truncationMode(.tail).layoutPriority(1)
+        let appIcon = Image(nsImage: icon(for: app.bundleID)).resizable()
+            .frame(width: IconSize.app, height: IconSize.app).accessibilityHidden(true)
+
+        return ViewThatFits(in: .horizontal) {
+            HStack(spacing: Spacing.md) {
+                appIcon
+                name.frame(minWidth: 96, idealWidth: 96, maxWidth: .infinity, alignment: .leading)
+                policy
+                remove
+            }
+            VStack(alignment: .leading, spacing: Spacing.sm) {
+                HStack(spacing: Spacing.md) {
+                    appIcon
+                    name
+                    Spacer(minLength: Spacing.sm)
+                    remove
+                }
+                policy.padding(.leading, IconSize.app + Spacing.md)
+            }
+        }
+        .padding(.horizontal, Surface.rowInset).padding(.vertical, Spacing.sm)
+        .frame(minHeight: 44)
     }
 }
 
@@ -120,10 +167,10 @@ private enum PolicyChoice: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .everyTime: return "Every time I switch to it"
+        case .everyTime: return "Every time"
         case .fiveMinutes: return "After 5 minutes"
         case .fifteenMinutes: return "After 15 minutes"
-        case .focusLoss5: return "5 minutes after I leave it"
+        case .focusLoss5: return "5 min after leaving"
         }
     }
 
