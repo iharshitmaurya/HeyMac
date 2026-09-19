@@ -14,8 +14,10 @@ private final class ShieldPanel: NSPanel {
         // Above every app window and the menu bar, but below the notch island (.mainMenu + 3).
         level = .mainMenu + 2
         collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .ignoresCycle]
-        isOpaque = true
-        backgroundColor = NSColor(white: 0.05, alpha: 1)
+        // The blur is drawn by the content view. With macOS "Reduce Transparency" on,
+        // NSVisualEffectView renders an opaque fallback, which is the safe behavior.
+        isOpaque = false
+        backgroundColor = .clear
         hasShadow = false
         isReleasedWhenClosed = false
         hidesOnDeactivate = false
@@ -27,7 +29,7 @@ private final class ShieldPanel: NSPanel {
     override var canBecomeMain: Bool { false }
 }
 
-/// One opaque panel per display. Panels are created ahead of time and only ordered in and
+/// One blurred panel per display. Panels are created ahead of time and only ordered in and
 /// out, so showing the shield is a single `orderFront` — the fewer frames of the locked
 /// app that can flash before it. There is deliberately no timeout and no other dismissal.
 @MainActor
@@ -35,6 +37,7 @@ final class ShieldController {
     let model = ShieldModel()
     private(set) var isShowing = false
     private var panels: [CGDirectDisplayID: ShieldPanel] = [:]
+    private var generation = 0
     private var screenObserver: NSObjectProtocol?
 
     init() {
@@ -56,14 +59,27 @@ final class ShieldController {
         let mouse = NSEvent.mouseLocation
         let primary = NSScreen.screens.first { NSMouseInRect(mouse, $0.frame, false) } ?? NSScreen.main
         model.primaryDisplayID = primary?.displayID
+        generation += 1
         isShowing = true
+        for panel in panels.values { panel.alphaValue = 1 }
         syncPanels(orderFront: true)
         if let id = primary?.displayID { panels[id]?.makeKey() }
     }
 
     func dismiss() {
         isShowing = false
-        for panel in panels.values { panel.orderOut(nil) }
+        generation += 1
+        let mine = generation
+        let fading = Array(panels.values)
+        NSAnimationContext.runAnimationGroup({ ctx in
+            ctx.duration = 0.25
+            for panel in fading { panel.animator().alphaValue = 0 }
+        }, completionHandler: { [weak self] in
+            MainActor.assumeIsolated {
+                guard self?.generation == mine else { return }
+                for panel in fading { panel.orderOut(nil); panel.alphaValue = 1 }
+            }
+        })
     }
 
     /// Creates panels for new displays, drops panels for removed ones, and refits the rest.

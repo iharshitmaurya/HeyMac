@@ -8,10 +8,29 @@ final class ShieldModel {
     var appName = ""
     var icon: NSImage?
     var phase: Phase = .scanning
-    /// The display that shows the icon and buttons; the others are plain dark.
+    /// The display that shows the text and buttons; the others are blur only.
     var primaryDisplayID: CGDirectDisplayID?
     var onRetry: () -> Void = {}
     var onQuitApp: () -> Void = {}
+}
+
+enum ShieldStyle {
+    /// Black tint over the blur: raise to darken, lower to reveal more of the app.
+    /// iOS-like look = window layout recognizable, text unreadable.
+    static let tint = 0.30
+}
+
+struct ShieldBlur: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSVisualEffectView {
+        let v = NSVisualEffectView()
+        v.material = .hudWindow
+        v.blendingMode = .behindWindow
+        v.state = .active
+        v.isEmphasized = false
+        return v
+    }
+
+    func updateNSView(_ view: NSVisualEffectView, context: Context) {}
 }
 
 struct ShieldView: View {
@@ -20,7 +39,8 @@ struct ShieldView: View {
 
     var body: some View {
         ZStack {
-            Color(nsColor: NSColor(white: 0.05, alpha: 1))
+            ShieldBlur()
+            Color.black.opacity(ShieldStyle.tint)
             if model.primaryDisplayID == displayID { content }
         }
         .ignoresSafeArea()
@@ -28,16 +48,15 @@ struct ShieldView: View {
 
     private var content: some View {
         VStack(spacing: 14) {
-            if let icon = model.icon {
-                Image(nsImage: icon).resizable().frame(width: 72, height: 72)
-            }
-            Text(model.appName)
-                .font(.system(size: 20, weight: .semibold))
+            Text("Face Unlock Required\nto open \(model.appName)")
+                .font(.system(size: 26, weight: .regular))
+                .lineSpacing(8)
+                .multilineTextAlignment(.center)
                 .foregroundStyle(.white)
-            Text(status)
-                .font(.system(size: 13))
-                .foregroundStyle(.white.opacity(0.6))
-            if case .needsAuth = model.phase {
+            if case .needsAuth(let message) = model.phase {
+                Text(message)
+                    .font(.system(size: 13))
+                    .foregroundStyle(.white.opacity(0.6))
                 HStack(spacing: 10) {
                     Button("Try Again") { model.onRetry() }.buttonStyle(PillButtonStyle(kind: .primary))
                     Button("Quit App") { model.onQuitApp() }.buttonStyle(PillButtonStyle(kind: .secondary))
@@ -45,13 +64,6 @@ struct ShieldView: View {
                 .padding(.top, 6)
             }
         }
-    }
-
-    private var status: String {
-        switch model.phase {
-        case .scanning: return "Looking for your face…"
-        case .needsAuth(let message): return message
-        case .unlocked: return "Unlocked"
-        }
+        .shadow(color: .black.opacity(0.35), radius: 6)
     }
 }
