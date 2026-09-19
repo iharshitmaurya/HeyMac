@@ -11,10 +11,12 @@ struct MenuContent: View {
                 Divider()
                 ForEach(model.problems, id: \.self) { problem in
                     Label(problem, systemImage: "exclamationmark.triangle.fill")
-                        .font(.system(size: 11.5))
-                        .foregroundStyle(Theme.warn)
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 4)
+                        .font(Typography.caption)
+                        .foregroundStyle(Theme.warnText)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, Spacing.lg)
+                        .padding(.vertical, Spacing.xs)
                 }
             }
             Divider()
@@ -33,14 +35,14 @@ struct MenuContent: View {
             }
             actionRow("Settings…", shortcut: "⌘,") { model.openSettings() }
             Divider()
-            actionRow("Quit FaceUnlock", shortcut: "⌘Q", tint: Theme.bad) { NSApplication.shared.terminate(nil) }
+            actionRow("Quit FaceUnlock", shortcut: "⌘Q", muted: true) { NSApplication.shared.terminate(nil) }
         }
-        .padding(.vertical, 6)
+        .padding(.vertical, Spacing.sm)
         .frame(width: 302)
     }
 
     private var statusBlock: some View {
-        HStack(spacing: 11) {
+        HStack(spacing: Spacing.md) {
             ZStack {
                 Circle().fill(Theme.accent)
                 Image(systemName: statusGlyph)
@@ -50,12 +52,12 @@ struct MenuContent: View {
             .frame(width: 34, height: 34)
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(statusTitle).font(.system(size: 13.5, weight: .bold))
-                Text(model.lastEvent).font(.system(size: 11.5)).foregroundStyle(.secondary)
+                Text(statusTitle).font(.system(size: 13.5, weight: .bold)).lineLimit(1)
+                CaptionText(model.lastEvent)
             }
             Spacer(minLength: 0)
         }
-        .padding(16)
+        .padding(Spacing.lg)
     }
 
     private var statusGlyph: String {
@@ -71,34 +73,48 @@ struct MenuContent: View {
         return "Face Unlock Is On"
     }
 
+    private static let rowHeight: CGFloat = 28
+
     private func toggleRow(_ label: String, isOn: Bool, action: @escaping (Bool) -> Void) -> some View {
         HStack {
-            Text(label).font(.system(size: 12.5))
-            Spacer()
+            Text(label).font(.system(size: 12.5)).lineLimit(1).truncationMode(.tail)
+            Spacer(minLength: Spacing.sm)
             Toggle("", isOn: Binding(get: { isOn }, set: action))
                 .labelsHidden()
                 .toggleStyle(.switch)
+                .controlSize(.small)
                 .tint(Theme.accent)
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 5)
+        .padding(.horizontal, Spacing.lg)
+        .frame(minHeight: Self.rowHeight)
     }
 
-    private func actionRow(_ label: String, shortcut: String?, tint: Color = .primary, action: @escaping () -> Void) -> some View {
+    /// `muted` (Quit) uses the secondary label tone rather than red: quitting is not destructive.
+    private func actionRow(_ label: String, shortcut: String?, muted: Bool = false, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             HStack {
-                Text(label).foregroundStyle(tint)
-                Spacer()
+                Text(label).lineLimit(1).truncationMode(.tail)
+                    .foregroundStyle(muted ? Color.secondary : Color.primary)
+                Spacer(minLength: Spacing.sm)
                 if let shortcut {
-                    Text(shortcut).font(.system(size: 10, design: .monospaced)).foregroundStyle(.secondary)
+                    Text(shortcut).font(Typography.caption).foregroundStyle(.secondary)
                 }
             }
             .font(.system(size: 12.5, weight: .medium))
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
+            .padding(.horizontal, Spacing.sm + 2)
+            .frame(minHeight: Self.rowHeight)
             .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
-        .padding(.horizontal, 6)
+        // ponytail: pressed-only feedback; hover needs per-row state (@State unavailable), add with an observable box when wanted.
+        .buttonStyle(MenuRowStyle())
+        .padding(.horizontal, Spacing.sm - 2)
+    }
+}
+
+private struct MenuRowStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .background(configuration.isPressed ? Color.primary.opacity(0.10) : .clear)
+            .clipShape(RoundedRectangle(cornerRadius: Radius.sm, style: Radius.style))
     }
 }
