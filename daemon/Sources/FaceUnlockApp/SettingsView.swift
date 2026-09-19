@@ -151,7 +151,7 @@ private struct StatusPane: View {
             .padding(Spacing.lg)
         }
 
-        PaneSection(footnote: "Open Log shows timestamps and match scores, never images or passwords.") {
+        PaneSection {
             SettingsCard {
                 switchRow("Start FaceUnlock at login",
                           isOn: Binding(get: { model.launchAtLogin }, set: { model.setLaunchAtLogin($0) }))
@@ -159,9 +159,12 @@ private struct StatusPane: View {
                 switchRow("Pause face unlock", caption: "Falls back to your password immediately",
                           isOn: Binding(get: { model.paused }, set: { model.setPaused($0) }))
             }
+        }
+
+        PaneSection {
+            CaptionText("Open Log shows timestamps and match scores, never images or passwords.")
             Button("Open Log") { NSWorkspace.shared.open(model.log.url) }
                 .buttonStyle(PillButtonStyle(kind: .secondary))
-                .padding(.top, Spacing.xs)
         }
     }
 
@@ -262,10 +265,8 @@ private struct FacePane: View {
         }
 
         PaneSection(footnote: "Removing your face data also turns off sudo and lock-screen unlock, and deletes the stored password.") {
-            ViewThatFits(in: .horizontal) {
-                HStack(spacing: Spacing.md) { buttons }
-                VStack(alignment: .leading, spacing: Spacing.sm) { buttons }
-            }
+            // Always stacked: two long pills side by side clip below ~700pt.
+            VStack(alignment: .leading, spacing: Spacing.sm) { buttons }
         }
     }
 
