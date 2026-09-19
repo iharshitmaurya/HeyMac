@@ -5,7 +5,6 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DAEMON_ROOT="$(dirname "$SCRIPT_DIR")"
-REPO_ROOT="$(dirname "$DAEMON_ROOT")"
 VERSION="${1:-1.0.0}"
 DIST="$DAEMON_ROOT/dist"
 APP="$DIST/FaceUnlock.app"
@@ -15,20 +14,17 @@ echo "Building executables (release)..."
 (cd "$DAEMON_ROOT" && swift build -c release --product FaceUnlock)
 BIN="$(cd "$DAEMON_ROOT" && swift build -c release --show-bin-path)"
 
-echo "Building the sudo PAM module..."
-(cd "$REPO_ROOT/pam" && make)
-
 echo "Assembling $APP..."
 rm -rf "$APP"
-mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources/pam"
+mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN/FaceUnlock" "$APP/Contents/MacOS/FaceUnlock"
 # SwiftPM's resource bundle holds the Core ML models; the app looks for it here.
 cp -R "$BIN/FaceUnlockDaemon_FaceUnlockCore.bundle" "$APP/Contents/Resources/"
 cp -R "$DAEMON_ROOT/Sources/FaceUnlockApp/Animations" "$APP/Contents/Resources/Animations"
 mkdir -p "$APP/Contents/Library/LaunchAgents"
 cp "$SCRIPT_DIR/app/com.faceunlock.app.agent.plist" "$APP/Contents/Library/LaunchAgents/"
-cp "$REPO_ROOT/pam/pam_faceunlock.so" "$APP/Contents/Resources/pam/"
-cp "$REPO_ROOT/pam/scripts/install-pam.sh" "$REPO_ROOT/pam/scripts/uninstall-pam.sh" "$APP/Contents/Resources/pam/"
+# One-time cleanup of the sudo hook that older versions installed (run by the app on first launch).
+cp "$SCRIPT_DIR/app/uninstall-sudo-hook.sh" "$APP/Contents/Resources/"
 sed "s/__VERSION__/$VERSION/g" "$SCRIPT_DIR/app/Info.plist" > "$APP/Contents/Info.plist"
 
 echo "Drawing the app icon..."
@@ -42,7 +38,6 @@ else
 fi
 
 echo "Signing..."
-sign_code "$APP/Contents/Resources/pam/pam_faceunlock.so" com.faceunlock.pam
 sign_code "$APP" com.faceunlock.app
 codesign --verify --deep --strict "$APP"
 if ! signing_identity_available; then

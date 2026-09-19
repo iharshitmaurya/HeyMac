@@ -144,7 +144,7 @@ struct SetupWizardView: View {
         VStack(alignment: .leading, spacing: Spacing.lg) {
             Image(systemName: "faceid").font(.system(size: 52)).foregroundStyle(Theme.accent)
                 .accessibilityHidden(true)
-            Text("Unlock sudo in Terminal and your lock screen by looking at the camera.")
+            Text("Unlock your Mac's lock screen by looking at the camera.")
             point("Your face stays on this Mac, stored encrypted as numbers — not photos.", icon: "lock.shield")
             point("Your password always keeps working. Face unlock is only a shortcut.", icon: "key")
             point("The camera runs only while a check is happening.", icon: "video")
@@ -314,16 +314,6 @@ struct SetupWizardView: View {
 
     private var features: some View {
         VStack(alignment: .leading, spacing: Spacing.lg) {
-            FormRow(title: "Unlock sudo with my face",
-                    caption: "Adds face unlock to sudo in Terminal. macOS asks for your admin password once to install it.") {
-                Toggle("Unlock sudo with my face", isOn: Binding(
-                    get: { flow.model.sudoEnabled }, set: { flow.model.setSudoEnabled($0) }
-                )).labelsHidden().toggleStyle(.switch).tint(Theme.accent).disabled(flow.model.busy)
-            }
-            .padding(.horizontal, -Surface.rowInset)
-
-            Divider()
-
             VStack(alignment: .leading, spacing: Spacing.sm) {
                 Text("Unlock the lock screen with my face").bold()
                 CaptionText("FaceUnlock types your login password for you when it recognizes your face. It needs your password stored, encrypted, on this Mac.")
@@ -353,19 +343,7 @@ struct SetupWizardView: View {
     private var done: some View {
         VStack(alignment: .leading, spacing: Spacing.lg) {
             banner("FaceUnlock is ready.", icon: "checkmark.seal.fill", tone: .good)
-            Text("Look for the face icon in the menu bar. From there you can pause it, test it, or change settings.")
-            if flow.model.sudoEnabled {
-                VStack(alignment: .leading, spacing: Spacing.sm) {
-                    Text("Try it in Terminal while looking at the camera:")
-                        .font(.callout).foregroundStyle(.secondary)
-                    Text("sudo -k; sudo whoami")
-                        .font(Typography.mono)
-                        .textSelection(.enabled)
-                        .padding(.horizontal, Spacing.md).padding(.vertical, Spacing.sm)
-                        .background(Surface.card)
-                        .clipShape(RoundedRectangle(cornerRadius: Radius.sm, style: Radius.style))
-                }
-            }
+            Text("Look for the face icon in the menu bar. From there you can pause it or open Settings, where you can also test it, lock apps with App Lock, or set it up again.")
         }
     }
 

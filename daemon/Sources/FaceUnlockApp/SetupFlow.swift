@@ -57,7 +57,7 @@ final class SetupFlow {
         case .camera: return "Camera access"
         case .enroll: return "Enroll your face"
         case .test: return "Check that it recognizes you"
-        case .features: return "Turn on what you want"
+        case .features: return "Lock-screen unlock"
         case .done: return "You're set"
         }
     }

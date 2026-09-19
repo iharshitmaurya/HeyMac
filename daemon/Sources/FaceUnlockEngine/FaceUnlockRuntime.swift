@@ -44,10 +44,6 @@ public final class FaceUnlockRuntime: @unchecked Sendable {
         camera = CameraCapture()
     }
 
-    public var socketPath: String {
-        supportDirectory.appendingPathComponent("faceunlock.sock").path
-    }
-
     public func pipeline(interactive: Bool, strictness: MatchStrictness) -> VerificationPipeline {
         VerificationPipeline(
             embedder: embedder, classifier: classifier,

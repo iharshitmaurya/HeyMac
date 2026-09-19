@@ -1,4 +1,4 @@
-FaceUnlock — unlock sudo and the lock screen with your face, on Apple Silicon Macs.
+FaceUnlock — unlock your Mac's lock screen and lock apps with your face, on Apple Silicon Macs.
 
 INSTALL
 1. Drag FaceUnlock into the Applications folder.

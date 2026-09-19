@@ -19,12 +19,10 @@ final class AppModel {
     let settings = EngineSettings()
     let log = AppLog.shared
     let windows = WindowPresenter()
-    let pam: PamInstaller
     private(set) var runtime: FaceUnlockRuntime?
     private var controller: EngineController?
 
     private(set) var setupComplete = false
-    private(set) var sudoEnabled = false
     private(set) var lockScreenEnabled = false
     private(set) var paused = false
     private(set) var lockScreenNeedsPassword = false
@@ -34,7 +32,6 @@ final class AppModel {
     private(set) var appLockEnabled = false
     private(set) var appLockApps: [LockedApp] = []
     private(set) var shieldMode = ShieldMode.saved
-    private(set) var pamStatus: PamStatus = .notInstalled
     private(set) var accessibilityTrusted = false
     private(set) var cameraAuthorized = false
     private(set) var busy = false
@@ -45,26 +42,23 @@ final class AppModel {
     var actionError: String?
 
     private init() {
-        let resources = (Bundle.main.resourceURL ?? Bundle.main.bundleURL).appendingPathComponent("pam")
-        pam = PamInstaller(resourcesDirectory: resources)
-
         if Self.uiSnapshotMode {
             // Deterministic sample state for the QA renderer; no runtime, engine, agent, timer or window.
             let sample = #"[{"bundleID":"net.whatsapp.WhatsApp","name":"\u200EWhatsApp","policy":{"everyTime":{}}},{"bundleID":"com.brave.Browser","name":"Brave Browser","policy":{"afterMinutes":{"_0":5}}},{"bundleID":"com.microsoft.Powerpoint","name":"Microsoft PowerPoint Insider Preview Edition","policy":{"afterFocusLossMinutes":{"_0":5}}},{"bundleID":"com.apple.Notes","name":"Notes","policy":{"afterMinutes":{"_0":15}}}]"#
             appLockApps = (try? JSONDecoder().decode([LockedApp].self, from: Data(sample.utf8))) ?? []
-            setupComplete = true; sudoEnabled = true; lockScreenEnabled = true; paused = false
+            setupComplete = true; lockScreenEnabled = true; paused = false
             strictness = .normal; unlocksToday = 42; launchAtLogin = true
             accessibilityTrusted = true; cameraAuthorized = true; appLockEnabled = true
-            pamStatus = .installed
             animationStyle = .minimal
             shieldMode = .fullScreen
-            lastEvent = "sudo unlocked 9:41 AM"
+            lastEvent = "lock screen unlocked 9:41 AM"
             return
         }
 
         if LegacyAgentMigration.migrateIfNeeded() {
             log.write("removed the old faceunlockd LaunchAgent (the app replaces it)")
         }
+        removeLegacySudoHookOnce()
         do {
             runtime = try FaceUnlockRuntime()
         } catch {
@@ -91,13 +85,36 @@ final class AppModel {
         }
     }
 
+    // MARK: - Legacy sudo hook
+
+    /// Sudo face unlock no longer exists; older versions left a PAM hook in /etc/pam.d. Offer to
+    /// remove it once (the flag is set first so a cancelled admin prompt never nags again).
+    private func removeLegacySudoHookOnce() {
+        let flag = "legacySudoCleanupAttempted"
+        guard !UserDefaults.standard.bool(forKey: flag) else { return }
+        let resources = Bundle.main.resourceURL ?? Bundle.main.bundleURL
+        let cleanup = LegacySudoCleanup(scriptURL: resources.appendingPathComponent("uninstall-sudo-hook.sh"))
+        guard cleanup.leftoverDetected() else { return }
+        UserDefaults.standard.set(true, forKey: flag)
+        let log = self.log
+        DispatchQueue.global(qos: .utility).async {
+            do {
+                try cleanup.remove()
+                log.write("removed the old sudo face-unlock hook")
+            } catch LegacySudoCleanupError.cancelled {
+                log.write("old sudo face-unlock hook left in place (administrator prompt cancelled)")
+            } catch {
+                log.write("could not remove the old sudo face-unlock hook: \(error)")
+            }
+        }
+    }
+
     // MARK: - Derived state
 
     var problems: [String] {
         var found: [String] = []
         if setupComplete {
             if !cameraAuthorized { found.append("Camera access is off") }
-            if sudoEnabled && pamStatus != .installed { found.append("sudo support needs reinstalling") }
             if lockScreenEnabled && !accessibilityTrusted { found.append("Accessibility permission is needed to type at the lock screen") }
             if lockScreenNeedsPassword { found.append("The stored password was rejected — save it again in Settings") }
         }
@@ -116,7 +133,6 @@ final class AppModel {
 
     func reloadSettings() {
         setupComplete = settings.setupComplete
-        sudoEnabled = settings.sudoEnabled
         lockScreenEnabled = settings.lockScreenEnabled
         paused = settings.paused
         lockScreenNeedsPassword = settings.lockScreenNeedsPassword
@@ -129,7 +145,6 @@ final class AppModel {
     func refreshSystemState() {
         accessibilityTrusted = AXIsProcessTrusted()
         cameraAuthorized = AVCaptureDevice.authorizationStatus(for: .video) == .authorized
-        pamStatus = pam.status()
         lockScreenNeedsPassword = settings.lockScreenNeedsPassword
     }
 
@@ -159,9 +174,6 @@ final class AppModel {
     func handle(_ event: EngineEvent) {
         let time = Date().formatted(date: .omitted, time: .shortened)
         switch event {
-        case .sudo(let matched, _):
-            lastEvent = matched ? "sudo unlocked \(time)" : "sudo not recognized \(time)"
-            if matched { countUnlock() }
         case .lockScreenScanning:
             lastEvent = "lock screen scanning \(time)"
         case .lockScreenUnlocked:
@@ -188,33 +200,6 @@ final class AppModel {
     }
 
     // MARK: - Actions
-
-    func setSudoEnabled(_ enabled: Bool) {
-        guard !busy else { return }
-        busy = true
-        actionError = nil
-        let installer = pam
-        DispatchQueue.global(qos: .userInitiated).async {
-            let result = Result { enabled ? try installer.install() : try installer.uninstall() }
-            DispatchQueue.main.async { [self] in finishSudoChange(enabled: enabled, result: result) }
-        }
-    }
-
-    private func finishSudoChange(enabled: Bool, result: Result<Void, Error>) {
-        busy = false
-        switch result {
-        case .success:
-            settings.sudoEnabled = enabled
-            log.write("sudo face unlock \(enabled ? "installed" : "removed")")
-        case .failure(PamInstallerError.cancelled):
-            break
-        case .failure(let error):
-            actionError = "Could not \(enabled ? "turn on" : "turn off") sudo unlock: \(error)"
-            log.write(actionError ?? "")
-        }
-        reloadSettings()
-        refreshSystemState()
-    }
 
     func setLockScreenEnabled(_ enabled: Bool) {
         if enabled, !(runtime?.hasLoginPassword ?? false) {
@@ -344,7 +329,6 @@ final class AppModel {
 
     func removeAllData() {
         stopEngine()
-        if pamStatus != .notInstalled { try? pam.uninstall() }
         do {
             try runtime?.removeAllData()
         } catch {

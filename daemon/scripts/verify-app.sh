@@ -14,9 +14,7 @@ for path in \
     Contents/Resources/Animations/unlockstatic.png \
     Contents/Resources/Animations/unlockanimation.mp4 \
     Contents/Resources/Animations/unsuccessfulunlockanimation.mp4 \
-    Contents/Resources/pam/pam_faceunlock.so \
-    Contents/Resources/pam/install-pam.sh \
-    Contents/Resources/pam/uninstall-pam.sh \
+    Contents/Resources/uninstall-sudo-hook.sh \
     Contents/Library/LaunchAgents/com.faceunlock.app.agent.plist
 do
     [ -e "$APP/$path" ] || fail "missing $path"
@@ -26,8 +24,7 @@ codesign --verify --deep --strict "$APP" || fail "signature does not verify"
 [ "$(/usr/libexec/PlistBuddy -c 'Print :LSUIElement' "$APP/Contents/Info.plist")" = "true" ] || fail "LSUIElement is not set (the app would show a Dock icon)"
 /usr/libexec/PlistBuddy -c 'Print :NSCameraUsageDescription' "$APP/Contents/Info.plist" >/dev/null || fail "no camera usage description"
 
-bash -n "$APP/Contents/Resources/pam/install-pam.sh" || fail "install-pam.sh is not valid shell"
-bash -n "$APP/Contents/Resources/pam/uninstall-pam.sh" || fail "uninstall-pam.sh is not valid shell"
+bash -n "$APP/Contents/Resources/uninstall-sudo-hook.sh" || fail "uninstall-sudo-hook.sh is not valid shell"
 
 "$APP/Contents/MacOS/FaceUnlock" --self-check || fail "self-check failed"
 

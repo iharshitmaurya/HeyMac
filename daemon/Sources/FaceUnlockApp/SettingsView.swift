@@ -5,7 +5,7 @@ import FaceUnlockEngine
 
 private enum SettingsPane: String, CaseIterable, Identifiable {
     case status = "Status"
-    case access = "Sudo & Lock Screen"
+    case lockScreen = "Lock Screen"
     case appLock = "App Lock"
     case face = "Face Data"
     case about = "About"
@@ -15,7 +15,7 @@ private enum SettingsPane: String, CaseIterable, Identifiable {
     var icon: String {
         switch self {
         case .status: return "checkmark.circle.fill"
-        case .access: return "lock.fill"
+        case .lockScreen: return "lock.fill"
         case .appLock: return "lock.square.fill"
         case .face: return "faceid"
         case .about: return "info.circle.fill"
@@ -73,7 +73,7 @@ struct SettingsView: View {
             VStack(alignment: .leading, spacing: Spacing.xl) {
                 switch selection.pane {
                 case .status: StatusPane(model: model)
-                case .access: AccessPane(model: model)
+                case .lockScreen: LockScreenPane(model: model)
                 case .appLock: AppLockPane(model: model)
                 case .face: FacePane(model: model)
                 case .about: AboutPane(model: model)
@@ -170,27 +170,19 @@ private struct StatusPane: View {
 
     private var statusSubtitle: String {
         guard model.setupComplete else { return "Finish setup to turn it on" }
-        switch (model.sudoEnabled, model.lockScreenEnabled) {
-        case (true, true): return "Active for sudo and the lock screen"
-        case (true, false): return "Active for sudo"
-        case (false, true): return "Active for the lock screen"
-        case (false, false): return "Nothing turned on yet"
-        }
+        return model.lockScreenEnabled ? "Active for the lock screen" : "Nothing turned on yet"
     }
 }
 
-// MARK: - Sudo & Lock Screen
+// MARK: - Lock Screen
 
-private struct AccessPane: View {
+private struct LockScreenPane: View {
     let model: AppModel
 
     var body: some View {
-        PaneTitle("Sudo & Lock Screen")
+        PaneTitle("Lock Screen")
 
         SettingsCard {
-            switchRow("Unlock sudo with my face", chip: sudoChip,
-                      isOn: Binding(get: { model.sudoEnabled }, set: { model.setSudoEnabled($0) }), disabled: model.busy)
-            RowDivider()
             switchRow("Unlock the lock screen with my face", chip: lockChip,
                       isOn: Binding(get: { model.lockScreenEnabled }, set: { model.setLockScreenEnabled($0) }))
         }
@@ -219,14 +211,6 @@ private struct AccessPane: View {
                 .pickerStyle(.segmented).labelsHidden()
                 .padding(Spacing.lg)
             }
-        }
-    }
-
-    private var sudoChip: StatusChip {
-        switch model.pamStatus {
-        case .installed: return StatusChip(text: "Installed", tone: .good)
-        case .partial: return StatusChip(text: "Needs reinstalling", tone: .warn)
-        case .notInstalled: return StatusChip(text: "Not installed", tone: .idle)
         }
     }
 
@@ -264,7 +248,7 @@ private struct FacePane: View {
             .padding(Spacing.lg)
         }
 
-        PaneSection(footnote: "Removing your face data also turns off sudo and lock-screen unlock, and deletes the stored password.") {
+        PaneSection(footnote: "Removing your face data also turns off lock-screen unlock, and deletes the stored password.") {
             // Always stacked: two long pills side by side clip below ~700pt.
             VStack(alignment: .leading, spacing: Spacing.sm) { buttons }
         }
@@ -280,7 +264,7 @@ private struct FacePane: View {
     private func confirmRemoval() {
         let alert = NSAlert()
         alert.messageText = "Remove your face data?"
-        alert.informativeText = "This deletes your enrolled face, the stored login password and the encryption key, and turns off sudo face unlock. You can set FaceUnlock up again afterwards."
+        alert.informativeText = "This deletes your enrolled face, the stored login password and the encryption key and turns off lock-screen face unlock. You can set FaceUnlock up again afterwards."
         alert.alertStyle = .warning
         alert.addButton(withTitle: "Cancel")
         let remove = alert.addButton(withTitle: "Remove")

@@ -37,8 +37,6 @@ struct MenuContent: View {
                 .padding(.bottom, Spacing.md)
             }
             divider
-            toggleRow("Unlock sudo with my face", icon: "faceid", isOn: model.sudoEnabled) { model.setSudoEnabled($0) }
-                .disabled(!model.setupComplete || model.busy)
             toggleRow("Unlock the lock screen", icon: "lock.fill", isOn: model.lockScreenEnabled) { model.setLockScreenEnabled($0) }
                 .disabled(!model.setupComplete)
             toggleRow("Pause", icon: "pause.circle", isOn: paused) { model.setPaused($0) }

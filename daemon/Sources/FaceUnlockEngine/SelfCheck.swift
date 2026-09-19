@@ -26,7 +26,7 @@ public enum SelfCheck {
 
         if Bundle.main.bundleURL.pathExtension == "app" {
             let resources = Bundle.main.resourceURL ?? Bundle.main.bundleURL
-            for name in ["pam/pam_faceunlock.so", "pam/install-pam.sh", "pam/uninstall-pam.sh"] {
+            for name in ["uninstall-sudo-hook.sh"] {
                 if !FileManager.default.fileExists(atPath: resources.appendingPathComponent(name).path) {
                     problems.append("missing bundled resource: \(name)")
                 }

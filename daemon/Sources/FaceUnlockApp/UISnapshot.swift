@@ -23,7 +23,7 @@ enum UISnapshot {
         try? FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
         let model = AppModel.shared
 
-        let paneNames = ["status", "access", "applock", "face", "about"]
+        let paneNames = ["status", "lockscreen", "applock", "face", "about"]
         let settingsSizes = [(640, 480), (680, 520), (820, 620), (1000, 760)]
         for (i, pane) in paneNames.enumerated() {
             for (w, h) in settingsSizes {

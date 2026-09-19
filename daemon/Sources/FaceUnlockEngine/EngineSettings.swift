@@ -24,13 +24,12 @@ public enum MatchStrictness: String, CaseIterable, Sendable {
 public final class EngineSettings: @unchecked Sendable {
     private enum Key {
         static let setupComplete = "setupComplete"
-        static let sudoEnabled = "sudoEnabled"
         static let lockScreenEnabled = "lockScreenEnabled"
         static let paused = "paused"
         static let lockScreenNeedsPassword = "lockScreenNeedsPassword"
         static let strictness = "matchStrictness"
         static let launchAtLogin = "launchAtLogin"
-        static let all = [setupComplete, sudoEnabled, lockScreenEnabled, paused, lockScreenNeedsPassword, strictness, launchAtLogin]
+        static let all = [setupComplete, lockScreenEnabled, paused, lockScreenNeedsPassword, strictness, launchAtLogin]
     }
 
     private let defaults: UserDefaults
@@ -42,11 +41,6 @@ public final class EngineSettings: @unchecked Sendable {
     public var setupComplete: Bool {
         get { defaults.bool(forKey: Key.setupComplete) }
         set { defaults.set(newValue, forKey: Key.setupComplete) }
-    }
-
-    public var sudoEnabled: Bool {
-        get { defaults.bool(forKey: Key.sudoEnabled) }
-        set { defaults.set(newValue, forKey: Key.sudoEnabled) }
     }
 
     public var lockScreenEnabled: Bool {

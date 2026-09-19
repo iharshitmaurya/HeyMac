@@ -23,7 +23,7 @@
 	<key>LSUIElement</key>
 	<true/>
 	<key>NSCameraUsageDescription</key>
-	<string>FaceUnlock uses the camera to recognize your face for sudo and lock-screen unlock. Images never leave this Mac.</string>
+	<string>FaceUnlock uses the camera to recognize your face for lock-screen unlock and App Lock. Images never leave this Mac.</string>
 	<key>NSHumanReadableCopyright</key>
 	<string>Face unlock for Apple Silicon Macs. Models: ArcFace (MIT) and MiniFASNetV2 (Apache-2.0).</string>
 </dict>

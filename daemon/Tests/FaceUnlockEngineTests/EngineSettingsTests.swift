@@ -7,7 +7,6 @@ import Foundation
     #expect(settings.strictness == .normal)
     #expect(settings.launchAtLogin == true)
 
-    settings.sudoEnabled = true
     settings.lockScreenEnabled = true
     settings.strictness = .strict
     settings.launchAtLogin = false
@@ -15,7 +14,6 @@ import Foundation
 
     settings.resetAll()
     #expect(settings.setupComplete == false)
-    #expect(settings.sudoEnabled == false)
     #expect(settings.lockScreenEnabled == false)
     #expect(settings.strictness == .normal)
     #expect(settings.launchAtLogin == true)
@@ -24,21 +22,6 @@ import Foundation
 @Test func strictnessThresholdsAreOrdered() {
     #expect(MatchStrictness.relaxed.threshold < MatchStrictness.normal.threshold)
     #expect(MatchStrictness.normal.threshold < MatchStrictness.strict.threshold)
-}
-
-@Test func sudoIsRefusedUntilSetUpAndEnabled() {
-    let settings = makeTestSettings()
-    settings.setupComplete = false
-    #expect(VerificationGate.sudo(settings) == .refuse("setup not complete"))
-
-    settings.setupComplete = true
-    #expect(VerificationGate.sudo(settings) == .refuse("sudo face unlock is off"))
-
-    settings.sudoEnabled = true
-    #expect(VerificationGate.sudo(settings) == .allow)
-
-    settings.paused = true
-    #expect(VerificationGate.sudo(settings) == .refuse("paused"))
 }
 
 @Test func lockScreenNeedsPermissionAndAGoodPassword() {
