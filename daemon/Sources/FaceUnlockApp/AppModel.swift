@@ -153,6 +153,8 @@ final class AppModel {
         case .lockScreenPasswordRejected:
             lastEvent = "stored password rejected \(time)"
             lockScreenNeedsPassword = true
+        case .lockScreenScanEnded:
+            lastEvent = "lock screen scan ended \(time)"
         case .lockScreenProblem(let reason):
             lastEvent = reason
         }

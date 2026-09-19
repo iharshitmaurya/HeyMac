@@ -37,12 +37,14 @@ final class NotchOverlayController {
     @ObservationIgnored private var transitionTask: Task<Void, Never>?
     @ObservationIgnored private var pulseTask: Task<Void, Never>?
     @ObservationIgnored private var resolveTask: Task<Void, Never>?
+    @ObservationIgnored private var scanTimeoutTask: Task<Void, Never>?
 
     func handle(_ event: EngineEvent) {
         switch event {
         case .lockScreenScanning: beginScanning()
         case .lockScreenUnlocked: finish(success: true)
         case .lockScreenPasswordRejected: finish(success: false)
+        case .lockScreenScanEnded: cancelScanning()
         default: break
         }
     }
@@ -52,17 +54,24 @@ final class NotchOverlayController {
     /// Opens on the still. The screen is locked here, so the panel goes into the lock space.
     func beginScanning(onLockScreen: Bool = true, style: UnlockAnimationStyle? = nil) {
         resolveTask?.cancel()
+        scanTimeoutTask?.cancel()
         ensureOpen(onLockScreen: onLockScreen, style: style)
         isLockOpen = false
         media = .idle
         phase = .scanning
         startPulse()
+        scanTimeoutTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(NotchGeometry.scanTimeout))
+            guard !Task.isCancelled else { return }
+            self?.cancelScanning()
+        }
     }
 
     /// Success has already unlocked the screen, so it plays on the desktop; a rejected
     /// password leaves the lock screen up, so failure stays where it is.
     func finish(success: Bool) {
         resolveTask?.cancel()
+        scanTimeoutTask?.cancel()
         if phase == .closed || phase == .collapsing { ensureOpen(onLockScreen: !success) }
         stopPulse()
         media = success ? .success : .failure
@@ -95,6 +104,7 @@ final class NotchOverlayController {
     func cancelScanning() {
         guard phase == .scanning else { return }
         resolveTask?.cancel()
+        scanTimeoutTask?.cancel()
         collapse()
     }
 

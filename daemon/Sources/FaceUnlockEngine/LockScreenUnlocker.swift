@@ -141,6 +141,7 @@ public final class LockScreenUnlocker: @unchecked Sendable {
             keepGoing: { !self.isStopRequested && !self.settings.paused && self.environment.isLocked() == true && self.environment.displayIsAwake() }
         )
         guard outcome.matched else {
+            onEvent(.lockScreenScanEnded)
             return outcome.failure.map { report($0) } ?? .noMatch
         }
 
@@ -151,6 +152,7 @@ public final class LockScreenUnlocker: @unchecked Sendable {
         do {
             try watcher.attemptUnlock(password: password)
         } catch {
+            onEvent(.lockScreenScanEnded)
             return .typingFailed("\(error)")
         }
 

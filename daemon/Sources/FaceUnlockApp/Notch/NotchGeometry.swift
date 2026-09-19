@@ -85,6 +85,9 @@ struct NotchGeometry {
     /// Breathing starts only once the panel has finished expanding.
     static let scanPulseStartDelay = 0.6
 
+    /// Safety net so a scan can never leave the island open forever; the engine's matching window is 30 s.
+    static let scanTimeout = 40.0
+
     // MARK: Result holds
 
     static let successHold = 1.7

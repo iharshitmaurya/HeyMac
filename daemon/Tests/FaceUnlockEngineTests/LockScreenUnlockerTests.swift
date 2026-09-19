@@ -102,3 +102,43 @@ private func makeUnlocker(
     #expect(unlocker.tick() == .notLocked)
     #expect(typist.typed.isEmpty)
 }
+
+private struct ThrowingTypist: PasswordTyping {
+    struct Failure: Error {}
+    func typeAndReturn(_ text: String) throws { throw Failure() }
+}
+
+@Test func aScanThatDoesNotMatchClosesTheIndicator() {
+    let system = FakeSystem()
+    let matcher = FakeMatcher()  // default outcome: matched == false, no failure
+    let settings = makeTestSettings { $0.lockScreenEnabled = true }
+    let recorder = EventRecorder()
+    let unlocker = makeUnlocker(system: system, matcher: matcher, typist: FakeTypist(system: system, unlocks: true), settings: settings, recorder: recorder)
+
+    #expect(unlocker.tick() == .noMatch)
+    #expect(recorder.events == [.lockScreenScanning, .lockScreenScanEnded])
+}
+
+@Test func aSuccessfulUnlockDoesNotEmitScanEnded() {
+    let system = FakeSystem()
+    let matcher = FakeMatcher()
+    matcher.outcome = matchedOutcome()
+    let settings = makeTestSettings { $0.lockScreenEnabled = true }
+    let recorder = EventRecorder()
+    let unlocker = makeUnlocker(system: system, matcher: matcher, typist: FakeTypist(system: system, unlocks: true), settings: settings, recorder: recorder)
+
+    #expect(unlocker.tick() == .unlocked)
+    #expect(!recorder.events.contains(.lockScreenScanEnded))
+}
+
+@Test func aTypingFailureClosesTheIndicator() {
+    let system = FakeSystem()
+    let matcher = FakeMatcher()
+    matcher.outcome = matchedOutcome()
+    let settings = makeTestSettings { $0.lockScreenEnabled = true }
+    let recorder = EventRecorder()
+    let unlocker = makeUnlocker(system: system, matcher: matcher, typist: ThrowingTypist(), settings: settings, recorder: recorder)
+
+    guard case .typingFailed = unlocker.tick() else { Issue.record("expected .typingFailed"); return }
+    #expect(recorder.events == [.lockScreenScanning, .lockScreenScanEnded])
+}
