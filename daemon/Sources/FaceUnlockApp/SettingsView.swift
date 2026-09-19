@@ -54,40 +54,23 @@ struct SettingsView: View {
     }
 
     private var sidebar: some View {
-        VStack(alignment: .leading, spacing: 2) {
+        VStack(alignment: .leading, spacing: Spacing.xxs) {
             ForEach(SettingsPane.allCases) { item in
-                Button {
+                SidebarItem(title: item.rawValue, systemImage: item.icon, isSelected: selection.pane == item) {
                     selection.pane = item
-                } label: {
-                    HStack(spacing: 10) {
-                        ZStack {
-                            RoundedRectangle(cornerRadius: 6)
-                                .fill(selection.pane == item ? Theme.accent : Color.primary.opacity(0.06))
-                            Image(systemName: item.icon)
-                                .font(.system(size: 11, weight: .semibold))
-                                .foregroundStyle(selection.pane == item ? Theme.accentInk : .secondary)
-                        }
-                        .frame(width: 22, height: 22)
-                        Text(item.rawValue).font(.system(size: 12.5, weight: .semibold))
-                        Spacer(minLength: 0)
-                    }
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 9)
-                    .background(selection.pane == item ? Color.primary.opacity(0.08) : .clear)
-                    .clipShape(RoundedRectangle(cornerRadius: 9))
-                    .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
+                .accessibilityLabel(item.rawValue)
             }
-            Spacer()
+            Spacer(minLength: 0)
         }
-        .padding(10)
-        .frame(width: 190)
+        .padding(Spacing.md)
+        .frame(width: 215)
     }
 
-    @ViewBuilder private var content: some View {
+    /// Detail column: scrolls, content capped at 640pt and left-aligned so wide windows don't stretch controls.
+    private var content: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
+            VStack(alignment: .leading, spacing: Spacing.xl) {
                 switch selection.pane {
                 case .status: StatusPane(model: model)
                 case .access: AccessPane(model: model)
@@ -96,9 +79,41 @@ struct SettingsView: View {
                 case .about: AboutPane(model: model)
                 }
             }
-            .padding(22)
+            .frame(maxWidth: 640, alignment: .leading)
+            .padding(Spacing.xl)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
+    }
+}
+
+/// Pane title, one style everywhere.
+struct PaneTitle: View {
+    let text: String
+    init(_ text: String) { self.text = text }
+    var body: some View {
+        Text(text).font(Typography.pageTitle).lineLimit(1).accessibilityAddTraits(.isHeader)
+    }
+}
+
+/// One section: optional header, the content, optional footnote; identical spacing on every pane.
+struct PaneSection<Content: View>: View {
+    var header: String? = nil
+    var footnote: String? = nil
+    @ViewBuilder let content: () -> Content
+    var body: some View {
+        VStack(alignment: .leading, spacing: Spacing.sm) {
+            if let header { SectionHeader(header) }
+            content()
+            if let footnote { CaptionText(footnote) }
+        }
+    }
+}
+
+/// A switch row inside a card: the title is the VoiceOver label.
+private func switchRow(_ title: String, caption: String? = nil, chip: StatusChip? = nil, isOn: Binding<Bool>, disabled: Bool = false) -> some View {
+    FormRow(title: title, caption: caption, chip: chip) {
+        Toggle(title, isOn: isOn)
+            .labelsHidden().toggleStyle(.switch).tint(Theme.accent).disabled(disabled)
     }
 }
 
@@ -108,53 +123,56 @@ private struct StatusPane: View {
     let model: AppModel
 
     var body: some View {
-        Text("Status").font(.system(size: 15.5, weight: .bold))
+        PaneTitle("Status")
 
-        HStack(spacing: 14) {
-            ZStack {
-                Circle().fill(Theme.accent)
-                Image(systemName: "checkmark").font(.system(size: 14, weight: .bold)).foregroundStyle(Theme.accentInk)
-            }
-            .frame(width: 36, height: 36)
+        SettingsCard(tinted: true) {
+            HStack(spacing: Spacing.md) {
+                ZStack {
+                    Circle().fill(Theme.accent)
+                    Image(systemName: "checkmark").font(.system(size: 14, weight: .bold)).foregroundStyle(Theme.accentInk)
+                }
+                .frame(width: 36, height: 36)
+                .accessibilityHidden(true)
 
-            VStack(alignment: .leading, spacing: 2) {
-                Text(model.setupComplete ? "Face Unlock Is On" : "Not Set Up Yet").font(.system(size: 14, weight: .bold))
-                Text(statusSubtitle).font(.system(size: 12)).foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: Spacing.xxs) {
+                    Text(model.setupComplete ? "Face unlock is on" : "Not set up yet")
+                        .font(.system(size: 14, weight: .bold)).lineLimit(1)
+                    Text(statusSubtitle).font(Typography.caption).foregroundStyle(.secondary)
+                        .lineLimit(2).fixedSize(horizontal: false, vertical: true)
+                }
+                .layoutPriority(1)
+                Spacer(minLength: Spacing.sm)
+                VStack(alignment: .trailing, spacing: 0) {
+                    Text("\(model.unlocksToday)").font(.system(size: 20, weight: .bold)).monospacedDigit()
+                    Text("unlocks today").font(Typography.caption).foregroundStyle(.secondary).lineLimit(1)
+                }
+                .fixedSize()
             }
-            Spacer()
-            VStack(alignment: .trailing, spacing: 0) {
-                Text("\(model.unlocksToday)").font(.system(size: 20, weight: .bold)).monospacedDigit()
-                Text("unlocks today").font(.system(size: 10)).foregroundStyle(.secondary)
-            }
+            .padding(Spacing.lg)
         }
-        .padding(16)
-        .background(Theme.accent.opacity(0.1))
-        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Theme.accent.opacity(0.25), lineWidth: 1))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
 
-        VStack(spacing: 0) {
-            SettingsRow(title: "Start FaceUnlock at login") {
-                Toggle("", isOn: Binding(get: { model.launchAtLogin }, set: { model.setLaunchAtLogin($0) })).labelsHidden().tint(Theme.accent)
+        PaneSection(footnote: "Open Log shows timestamps and match scores, never images or passwords.") {
+            SettingsCard {
+                switchRow("Start FaceUnlock at login",
+                          isOn: Binding(get: { model.launchAtLogin }, set: { model.setLaunchAtLogin($0) }))
+                RowDivider()
+                switchRow("Pause face unlock", caption: "Falls back to your password immediately",
+                          isOn: Binding(get: { model.paused }, set: { model.setPaused($0) }))
             }
-            Divider().padding(.leading, 12)
-            SettingsRow(title: "Pause face unlock", subtitle: "Falls back to your password immediately") {
-                Toggle("", isOn: Binding(get: { model.paused }, set: { model.setPaused($0) })).labelsHidden().tint(Theme.accent)
-            }
+            Button("Open Log") { NSWorkspace.shared.open(model.log.url) }
+                .buttonStyle(PillButtonStyle(kind: .secondary))
+                .padding(.top, Spacing.xs)
         }
-        .background(Color.primary.opacity(0.05))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-
-        Text("Open Log shows timestamps and match scores — never images or passwords.")
-            .font(.system(size: 11.5)).foregroundStyle(.secondary)
-        Button("Open Log") { NSWorkspace.shared.open(model.log.url) }.buttonStyle(PillButtonStyle(kind: .secondary))
     }
 
     private var statusSubtitle: String {
         guard model.setupComplete else { return "Finish setup to turn it on" }
-        var parts: [String] = []
-        if model.sudoEnabled { parts.append("sudo") }
-        if model.lockScreenEnabled { parts.append("lock screen") }
-        return parts.isEmpty ? "nothing turned on" : parts.joined(separator: " · ") + " · active"
+        switch (model.sudoEnabled, model.lockScreenEnabled) {
+        case (true, true): return "Active for sudo and the lock screen"
+        case (true, false): return "Active for sudo"
+        case (false, true): return "Active for the lock screen"
+        case (false, false): return "Nothing turned on yet"
+        }
     }
 }
 
@@ -164,45 +182,40 @@ private struct AccessPane: View {
     let model: AppModel
 
     var body: some View {
-        Text("Sudo & Lock Screen").font(.system(size: 15.5, weight: .bold))
+        PaneTitle("Sudo & Lock Screen")
 
-        VStack(spacing: 0) {
-            SettingsRow(title: "Unlock sudo with my face", chip: sudoChip) {
-                Toggle("", isOn: Binding(get: { model.sudoEnabled }, set: { model.setSudoEnabled($0) }))
-                    .labelsHidden().tint(Theme.accent).disabled(model.busy)
-            }
-            Divider().padding(.leading, 12)
-            SettingsRow(title: "Unlock the lock screen", chip: lockChip) {
-                Toggle("", isOn: Binding(get: { model.lockScreenEnabled }, set: { model.setLockScreenEnabled($0) })).labelsHidden().tint(Theme.accent)
-            }
-        }
-        .background(Color.primary.opacity(0.05))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Matching strictness").font(.system(size: 13, weight: .semibold))
-            Picker("", selection: Binding(get: { model.strictness }, set: { model.setStrictness($0) })) {
-                ForEach(MatchStrictness.allCases, id: \.self) { level in
-                    Text(level.title).tag(level)
-                }
-            }
-            .pickerStyle(.segmented)
-            .labelsHidden()
-            Text("Stricter means fewer false matches, but it may not recognize you in poor light.")
-                .font(.system(size: 11.5)).foregroundStyle(.secondary)
+        SettingsCard {
+            switchRow("Unlock sudo with my face", chip: sudoChip,
+                      isOn: Binding(get: { model.sudoEnabled }, set: { model.setSudoEnabled($0) }), disabled: model.busy)
+            RowDivider()
+            switchRow("Unlock the lock screen with my face", chip: lockChip,
+                      isOn: Binding(get: { model.lockScreenEnabled }, set: { model.setLockScreenEnabled($0) }))
         }
 
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Unlock animation").font(.system(size: 13, weight: .semibold))
-            Picker("", selection: Binding(get: { model.animationStyle }, set: { model.setAnimationStyle($0) })) {
-                ForEach(UnlockAnimationStyle.allCases) { style in
-                    Text(style.title).tag(style)
+        PaneSection(header: "Matching strictness",
+                    footnote: "Stricter means fewer false matches, but it may not recognize you in poor light.") {
+            SettingsCard {
+                Picker("Matching strictness", selection: Binding(get: { model.strictness }, set: { model.setStrictness($0) })) {
+                    ForEach(MatchStrictness.allCases, id: \.self) { level in
+                        Text(level.title).tag(level)
+                    }
                 }
+                .pickerStyle(.segmented).labelsHidden()
+                .padding(Spacing.lg)
             }
-            .pickerStyle(.segmented)
-            .labelsHidden()
-            Text("Minimal widens the notch just enough for a lock and a small animation. Original opens a large panel. Picking one plays a preview.")
-                .font(.system(size: 11.5)).foregroundStyle(.secondary)
+        }
+
+        PaneSection(header: "Unlock animation",
+                    footnote: "Minimal widens the notch just enough for a lock and a small animation. Original opens a large panel. Picking one plays a preview.") {
+            SettingsCard {
+                Picker("Unlock animation", selection: Binding(get: { model.animationStyle }, set: { model.setAnimationStyle($0) })) {
+                    ForEach(UnlockAnimationStyle.allCases) { style in
+                        Text(style.title).tag(style)
+                    }
+                }
+                .pickerStyle(.segmented).labelsHidden()
+                .padding(Spacing.lg)
+            }
         }
     }
 
@@ -227,38 +240,50 @@ private struct FacePane: View {
     let model: AppModel
 
     var body: some View {
-        Text("Face Data").font(.system(size: 15.5, weight: .bold))
+        PaneTitle("Face Data")
 
-        HStack(spacing: 14) {
-            Circle().fill(Color.primary.opacity(0.08)).overlay(Circle().stroke(Color.primary.opacity(0.12))).frame(width: 44, height: 44)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(model.setupComplete ? "Enrolled" : "Not enrolled").font(.system(size: 13.5, weight: .bold))
-                if model.setupComplete {
-                    Text("8 live samples, encrypted on this Mac").font(.system(size: 11.5)).foregroundStyle(.secondary)
+        SettingsCard {
+            HStack(spacing: Spacing.md) {
+                Image(systemName: "faceid")
+                    .font(.system(size: 22, weight: .regular))
+                    .foregroundStyle(model.setupComplete ? Theme.accentText : Color.secondary)
+                    .frame(width: IconSize.avatar, height: IconSize.avatar)
+                    .background(Color.primary.opacity(0.06), in: Circle())
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: Spacing.xxs) {
+                    Text(model.setupComplete ? "Enrolled" : "Not enrolled").font(Typography.rowTitle).lineLimit(1)
+                    Text(model.setupComplete ? "Stored encrypted on this Mac" : "Run setup to enroll your face")
+                        .font(Typography.caption).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
+                Spacer(minLength: 0)
             }
-            Spacer()
+            .padding(Spacing.lg)
         }
-        .padding(16)
-        .background(Color.primary.opacity(0.05))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
 
-        HStack(spacing: 10) {
-            Button("Re-enroll My Face…") { model.reEnroll() }.buttonStyle(PillButtonStyle(kind: .secondary))
-            Button("Remove My Face Data…") { confirmRemoval() }.buttonStyle(PillButtonStyle(kind: .danger))
+        PaneSection(footnote: "Removing your face data also turns off sudo and lock-screen unlock, and deletes the stored password.") {
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: Spacing.md) { buttons }
+                VStack(alignment: .leading, spacing: Spacing.sm) { buttons }
+            }
         }
-        Text("Removing your face data also turns off sudo and lock-screen unlock, and deletes the stored password.")
-            .font(.system(size: 11.5)).foregroundStyle(.secondary)
     }
 
+    @ViewBuilder private var buttons: some View {
+        Button("Re-enroll My Face…") { model.reEnroll() }.buttonStyle(PillButtonStyle(kind: .secondary))
+        Button("Remove My Face Data…") { confirmRemoval() }.buttonStyle(PillButtonStyle(kind: .danger))
+    }
+
+    /// Cancel is the default (Return) button; the destructive confirm is second and never the default.
     private func confirmRemoval() {
         let alert = NSAlert()
         alert.messageText = "Remove your face data?"
         alert.informativeText = "This deletes your enrolled face, the stored login password and the encryption key, and turns off sudo face unlock. You can set FaceUnlock up again afterwards."
         alert.alertStyle = .warning
-        alert.addButton(withTitle: "Remove")
         alert.addButton(withTitle: "Cancel")
-        if alert.runModal() == .alertFirstButtonReturn {
+        let remove = alert.addButton(withTitle: "Remove")
+        remove.hasDestructiveAction = true
+        if alert.runModal() == .alertSecondButtonReturn {
             model.removeAllData()
             model.windows.close(id: "settings")
         }
@@ -270,42 +295,41 @@ private struct FacePane: View {
 private struct AboutPane: View {
     let model: AppModel
 
-    var body: some View {
-        HStack(spacing: 16) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 12).fill(Theme.accent)
-                Image(systemName: "faceid").font(.system(size: 22, weight: .semibold)).foregroundStyle(Theme.accentInk)
-            }
-            .frame(width: 52, height: 52)
-            VStack(alignment: .leading, spacing: 3) {
-                Text("FaceUnlock").font(.system(size: 16, weight: .bold))
-                Text("Version 1.0.0").font(.system(size: 11.5, design: .monospaced)).foregroundStyle(.secondary)
-            }
-        }
-        Text("Face embedding: ArcFace (w600k_mbf), MIT. Liveness: MiniFASNetV2, minivision-ai/Silent-Face-Anti-Spoofing, Apache-2.0. Both run on-device — nothing is ever uploaded.")
-            .font(.system(size: 11)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+    private var version: String {
+        (Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String) ?? "1.0.0"
     }
-}
-
-// MARK: - Shared row
-
-private struct SettingsRow<Trailing: View>: View {
-    let title: String
-    var subtitle: String?
-    var chip: StatusChip?
-    @ViewBuilder let trailing: () -> Trailing
 
     var body: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(title).font(.system(size: 13, weight: .semibold))
-                if let subtitle { Text(subtitle).font(.system(size: 11.5)).foregroundStyle(.secondary) }
-                if let chip { chip }
+        PaneTitle("About")
+
+        SettingsCard {
+            HStack(spacing: Spacing.lg) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: Radius.lg, style: Radius.style).fill(Theme.accent)
+                    Image(systemName: "faceid").font(.system(size: 22, weight: .semibold)).foregroundStyle(Theme.accentInk)
+                }
+                .frame(width: 52, height: 52)
+                .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: Spacing.xs) {
+                    Text("FaceUnlock").font(.system(size: 16, weight: .bold)).lineLimit(1)
+                    Text("Version \(version)").font(Typography.mono).foregroundStyle(.secondary).lineLimit(1)
+                }
+                Spacer(minLength: 0)
             }
-            Spacer()
-            trailing()
+            .padding(Spacing.lg)
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 12)
+
+        PaneSection(header: "Open-source components",
+                    footnote: "Both models run on this Mac. Nothing is ever uploaded.") {
+            SettingsCard {
+                FormRow(title: "Face embedding", caption: "ArcFace (w600k_mbf)") { license("MIT") }
+                RowDivider()
+                FormRow(title: "Liveness", caption: "MiniFASNetV2, from minivision-ai/Silent-Face-Anti-Spoofing") { license("Apache-2.0") }
+            }
+        }
+    }
+
+    private func license(_ text: String) -> some View {
+        Text(text).font(Typography.mono).foregroundStyle(.secondary).lineLimit(1)
     }
 }
