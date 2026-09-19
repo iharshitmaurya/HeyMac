@@ -45,6 +45,9 @@ enum UISnapshot {
         }
 
         each { MenuContent(model: model) } render: { snap($0, screen: "menu", size: (302, nil), dark: $1) }
+        each { MenuContent(model: model, previewPaused: true) } render: { snap($0, screen: "menu-paused", size: (302, nil), dark: $1) }
+        each { MenuContent(model: model, previewProblems: ["Camera access is off", "Accessibility permission is needed to type at the lock screen"]) }
+            render: { snap($0, screen: "menu-problems", size: (302, nil), dark: $1) }
         each { snapshotAppPickerSheet(model: model) } render: { snap($0, screen: "applock-picker", size: (380, nil), dark: $1) }
         each { snapshotAppPickerEmpty(model: model) } render: { snap($0, screen: "applock-picker-empty", size: (380, 340), dark: $1) }
 
