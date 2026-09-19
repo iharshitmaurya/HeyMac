@@ -70,8 +70,6 @@ struct AppLockPane: View {
                 .padding(Spacing.lg)
             }
         }
-
-        CaptionText("App Lock is a convenience, not a security boundary — quitting FaceUnlock from Activity Monitor bypasses it, and notification previews may still appear.")
     }
 
     private var shieldCaption: String {
