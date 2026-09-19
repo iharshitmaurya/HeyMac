@@ -16,7 +16,7 @@ public enum KeychainKeyProviderError: Error, Equatable {
 /// from reading it silently.
 ///
 /// `interactive: false` is for background verification: it never shows a dialog (a blocked
-/// unseen prompt would stop the app answering sudo and the lock screen) and never creates
+/// unseen prompt would stop the app unlocking the lock screen) and never creates
 /// a key (a fresh key would silently orphan the existing encrypted enrollment). Interactive
 /// mode is for user-initiated actions (enroll, save password, Test Now) and may prompt; choosing "Always
 /// Allow" there authorizes this binary for background checks too.
