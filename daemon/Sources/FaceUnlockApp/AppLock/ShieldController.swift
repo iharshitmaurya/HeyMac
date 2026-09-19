@@ -40,7 +40,6 @@ final class ShieldController {
     private var activeMode: ShieldMode = .fullScreen
     private var windowShield: AppWindowShield?
     private var panels: [CGDirectDisplayID: ShieldPanel] = [:]
-    private var generation = 0
     private var screenObserver: NSObjectProtocol?
 
     init() {
@@ -62,18 +61,7 @@ final class ShieldController {
         let mouse = NSEvent.mouseLocation
         let primary = NSScreen.screens.first { NSMouseInRect(mouse, $0.frame, false) } ?? NSScreen.main
         model.primaryDisplayID = primary?.displayID
-        generation += 1
         activeMode = mode == .appWindowsOnly && pid > 0 ? .appWindowsOnly : .fullScreen
-        // Through the animator with zero duration so a still-running dismiss fade is cancelled;
-        // a direct write would be overwritten when that fade lands on 0.
-        NSAnimationContext.runAnimationGroup { ctx in
-            ctx.duration = 0
-            for panel in panels.values { panel.animator().alphaValue = 1 }
-        }
-        // Animator cancellation semantics are unverified, so also restore the alpha directly and
-        // again in the stale-fade completion below: privacy over polish (costs a brief flicker
-        // when a present lands during a fade).
-        for panel in panels.values { panel.alphaValue = 1 }
         if activeMode == .fullScreen, windowShield?.isShowing == true { windowShield?.dismiss() }
         if activeMode == .appWindowsOnly {
             let shield = windowShield ?? AppWindowShield(model: model)
@@ -104,24 +92,19 @@ final class ShieldController {
     func dismiss() {
         panelsUp = false
         windowShield?.dismiss()
-        generation += 1
-        let mine = generation
-        let fading = Array(panels.values)
+        // Retire the fading panels: they finish fading and are ordered out on their own and are
+        // never reused, so a present() during the fade always works with fresh panels at full alpha.
+        // A fresh pre-warmed (not ordered in) set is created right away so the next present is
+        // still a single orderFront.
+        let retired = Array(panels.values)
+        panels.removeAll()
         NSAnimationContext.runAnimationGroup({ ctx in
             ctx.duration = 0.25
-            for panel in fading { panel.animator().alphaValue = 0 }
-        }, completionHandler: { [weak self] in
-            MainActor.assumeIsolated {
-                guard let self else { return }
-                guard self.generation == mine else {
-                    // Stale: a newer present landed mid-fade and this fade may have finished
-                    // after it, leaving the panels invisible. Restore them if a shield is up.
-                    if self.isShowing { for panel in fading { panel.alphaValue = 1 } }
-                    return
-                }
-                for panel in fading { panel.orderOut(nil); panel.alphaValue = 1 }
-            }
+            for panel in retired { panel.animator().alphaValue = 0 }
+        }, completionHandler: {
+            MainActor.assumeIsolated { for panel in retired { panel.orderOut(nil) } }
         })
+        syncPanels(orderFront: false)
     }
 
     /// Creates panels for new displays, drops panels for removed ones, and refits the rest.

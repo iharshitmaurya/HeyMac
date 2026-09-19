@@ -79,26 +79,15 @@ final class AppWindowShield {
     private var pool: [CGWindowID: BlurPanel] = [:]
     private var contentWindow: CGWindowID?
     private var lastCount = 0
-    private var generation = 0
+    private var contentNeedsKey = false
 
     init(model: ShieldModel) { self.model = model }
 
     func present(pid: pid_t) {
         guard pid > 0, pid != ProcessInfo.processInfo.processIdentifier else { return }
         self.pid = pid
-        generation += 1
         isShowing = true
         lastCount = 0
-        // Reset through the animator with zero duration so a still-running dismiss fade is
-        // cancelled; setting alphaValue directly would be overwritten when it lands on 0.
-        NSAnimationContext.runAnimationGroup { ctx in
-            ctx.duration = 0
-            for panel in pool.values { panel.animator().alphaValue = 1 }
-        }
-        // Animator cancellation semantics are unverified, so also restore the alpha directly and
-        // again in the stale-fade completion below: privacy over polish (costs a brief flicker
-        // when a present lands during a fade).
-        for panel in pool.values { panel.alphaValue = 1 }
         timer?.invalidate()
         tick()
         let t = Timer(timeInterval: Self.pollInterval, repeats: true) { [weak self] timer in
@@ -113,26 +102,18 @@ final class AppWindowShield {
         timer?.invalidate()
         timer = nil
         isShowing = false
-        generation += 1
-        let mine = generation
-        let fading = Array(pool.values)
+        // Retire the panels: they finish fading and are ordered out on their own and are never
+        // reused, so a present() during the fade builds fresh panels at full alpha.
+        let retired = Array(pool.values)
+        pool.removeAll()
+        contentWindow = nil
+        contentNeedsKey = false
+        lastCount = 0
         NSAnimationContext.runAnimationGroup({ ctx in
             ctx.duration = 0.25
-            for panel in fading { panel.animator().alphaValue = 0 }
-        }, completionHandler: { [weak self] in
-            MainActor.assumeIsolated {
-                guard let self else { return }
-                guard self.generation == mine else {
-                    // Stale: a newer present landed mid-fade and this fade may have finished
-                    // after it, leaving the panels invisible. Restore them if showing.
-                    if self.isShowing { for panel in fading { panel.alphaValue = 1 } }
-                    return
-                }
-                for panel in fading { panel.orderOut(nil); panel.alphaValue = 1 }
-                self.pool.removeAll()
-                self.contentWindow = nil
-                self.lastCount = 0
-            }
+            for panel in retired { panel.animator().alphaValue = 0 }
+        }, completionHandler: {
+            MainActor.assumeIsolated { for panel in retired { panel.orderOut(nil) } }
         })
     }
 
@@ -174,8 +155,14 @@ final class AppWindowShield {
             contentWindow = largest
             if let n = largest, let p = pool[n] {
                 p.setHostsContent(true)
-                if NSApp.isActive { p.makeKey() }
+                contentNeedsKey = true
             }
+        }
+        // Not gated on the change itself: the app may not be active yet when the window is
+        // first chosen. Never called every tick (it would fight the system Touch ID sheet).
+        if contentNeedsKey, NSApp.isActive, let n = contentWindow, let p = pool[n] {
+            p.makeKey()
+            contentNeedsKey = false
         }
         if wins.count != lastCount {
             lastCount = wins.count
