@@ -6,6 +6,7 @@ import SwiftUI
 
 struct NotchOverlayView: View {
     let controller: NotchOverlayController
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var style: NotchPanelStyle { controller.geometry.style }
     private var closedSize: CGSize { controller.geometry.closedSize }
@@ -69,8 +70,8 @@ struct NotchOverlayView: View {
         style == .pill ? NotchGeometry.pillContentPadding : NotchGeometry.notchContentPadding
     }
 
-    private var pulseScale: CGFloat { controller.isPulseDimmed ? NotchGeometry.scanPulseScale : 1 }
-    private var pulseOpacity: Double { controller.isPulseDimmed ? NotchGeometry.scanPulseOpacity : 1 }
+    private var pulseScale: CGFloat { reduceMotion ? 1 : controller.isPulseDimmed ? NotchGeometry.scanPulseScale : 1 }
+    private var pulseOpacity: Double { reduceMotion ? 1 : controller.isPulseDimmed ? NotchGeometry.scanPulseOpacity : 1 }
 
     @ViewBuilder private var scanContent: some View {
         if isMinimal {
@@ -106,6 +107,8 @@ struct NotchOverlayView: View {
             // Only while expanded — otherwise a faint halo shows around the real notch.
             .shadow(color: .black.opacity(isExpanded ? 0.3 : 0), radius: 9)
             .offset(y: verticalOffset)
+            // Reduce Motion: replace the controller's springs/slides with a short fade.
+            .transaction { if reduceMotion { $0.animation = $0.animation == nil ? nil : .easeOut(duration: 0.15) } }
             .frame(width: NotchGeometry.windowSize.width, height: NotchGeometry.windowSize.height, alignment: .top)
     }
 }

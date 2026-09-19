@@ -197,30 +197,47 @@ private struct AppPickerSheet: View {
     }
 
     var body: some View {
-        VStack(spacing: 12) {
-            Text("Choose apps to lock").font(.system(size: 14, weight: .bold))
+        VStack(alignment: .leading, spacing: Spacing.md) {
+            Text("Choose apps to lock").font(Typography.pageTitle)
             TextField("Search", text: Binding(get: { picker.search }, set: { picker.search = $0 }))
                 .textFieldStyle(.roundedBorder)
-            List(results) { app in
-                Button {
-                    model.addLockedApp(app)
-                } label: {
-                    HStack(spacing: 10) {
-                        Image(nsImage: NSWorkspace.shared.icon(forFile: app.url.path))
-                            .resizable().frame(width: 26, height: 26)
-                        Text(app.name)
-                        Spacer()
-                        Image(systemName: "plus.circle").foregroundStyle(.secondary)
-                    }
-                    .contentShape(Rectangle())
+            if results.isEmpty {
+                VStack(spacing: Spacing.sm) {
+                    Image(systemName: "magnifyingglass").font(.system(size: 28)).foregroundStyle(.secondary)
+                        .accessibilityHidden(true)
+                    Text("No matching apps").font(Typography.rowTitle)
+                    CaptionText(picker.search.isEmpty ? "Every installed app is already locked." : "Try a different name.")
                 }
-                .buttonStyle(.plain)
+                .frame(maxWidth: .infinity, minHeight: 240, maxHeight: .infinity)
+            } else {
+                List(results) { app in
+                    Button {
+                        model.addLockedApp(app)
+                    } label: {
+                        HStack(spacing: Spacing.md) {
+                            Image(nsImage: NSWorkspace.shared.icon(forFile: app.url.path))
+                                .resizable().frame(width: IconSize.app, height: IconSize.app)
+                                .accessibilityHidden(true)
+                            Text(app.name).lineLimit(1).truncationMode(.tail)
+                            Spacer(minLength: Spacing.sm)
+                            Image(systemName: "plus.circle").foregroundStyle(.secondary)
+                        }
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Add \(app.name) to App Lock")
+                }
+                .frame(minHeight: 240, idealHeight: 320, maxHeight: .infinity)
             }
-            .frame(height: 300)
-            Button("Done") { picker.isOpen = false }.buttonStyle(PillButtonStyle(kind: .primary))
+            HStack {
+                Spacer()
+                Button("Done") { picker.isOpen = false }
+                    .buttonStyle(PillButtonStyle(kind: .primary))
+                    .keyboardShortcut(.defaultAction)
+            }
         }
-        .padding(18)
-        .frame(width: 380)
+        .padding(Spacing.lg + 2)
+        .frame(minWidth: 380, idealWidth: 380)
     }
 }
 
@@ -237,5 +254,13 @@ private func icon(for bundleID: String) -> NSImage {
 func snapshotAppPickerSheet(model: AppModel) -> some View {
     let state = PickerState()
     state.installed = InstalledApps.scan(roots: [URL(fileURLWithPath: "/System/Applications")])
+    return AppPickerSheet(model: model, picker: state)
+}
+
+/// Snapshot-only: the no-results state.
+@MainActor
+func snapshotAppPickerEmpty(model: AppModel) -> some View {
+    let state = PickerState()
+    state.search = "zzzz"
     return AppPickerSheet(model: model, picker: state)
 }

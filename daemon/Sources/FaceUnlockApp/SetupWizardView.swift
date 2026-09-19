@@ -314,12 +314,13 @@ struct SetupWizardView: View {
 
     private var features: some View {
         VStack(alignment: .leading, spacing: Spacing.lg) {
-            VStack(alignment: .leading, spacing: Spacing.sm) {
+            FormRow(title: "Unlock sudo with my face",
+                    caption: "Adds face unlock to sudo in Terminal. macOS asks for your admin password once to install it.") {
                 Toggle("Unlock sudo with my face", isOn: Binding(
                     get: { flow.model.sudoEnabled }, set: { flow.model.setSudoEnabled($0) }
-                )).toggleStyle(.switch).tint(Theme.accent).disabled(flow.model.busy)
-                CaptionText("Adds face unlock to sudo in Terminal. macOS asks for your admin password once to install it.")
+                )).labelsHidden().toggleStyle(.switch).tint(Theme.accent).disabled(flow.model.busy)
             }
+            .padding(.horizontal, -Surface.rowInset)
 
             Divider()
 

@@ -46,6 +46,7 @@ enum UISnapshot {
 
         each { MenuContent(model: model) } render: { snap($0, screen: "menu", size: (302, nil), dark: $1) }
         each { snapshotAppPickerSheet(model: model) } render: { snap($0, screen: "applock-picker", size: (380, nil), dark: $1) }
+        each { snapshotAppPickerEmpty(model: model) } render: { snap($0, screen: "applock-picker-empty", size: (380, 340), dark: $1) }
 
         for (name, phase) in [("scanning", ShieldModel.Phase.scanning), ("needsauth", .needsAuth("Face not recognized. Try again or quit the app."))] {
             each { () -> AnyView in
