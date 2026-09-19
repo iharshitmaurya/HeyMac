@@ -64,12 +64,18 @@ final class ShieldController {
         model.primaryDisplayID = primary?.displayID
         generation += 1
         activeMode = mode == .appWindowsOnly && pid > 0 ? .appWindowsOnly : .fullScreen
-        for panel in panels.values { panel.alphaValue = 1 }
+        // Through the animator with zero duration so a still-running dismiss fade is cancelled;
+        // a direct write would be overwritten when that fade lands on 0.
+        NSAnimationContext.runAnimationGroup { ctx in
+            ctx.duration = 0
+            for panel in panels.values { panel.animator().alphaValue = 1 }
+        }
+        if activeMode == .fullScreen, windowShield?.isShowing == true { windowShield?.dismiss() }
         if activeMode == .appWindowsOnly {
             let shield = windowShield ?? AppWindowShield(model: model)
             windowShield = shield
             shield.onWindowCountChange = { [weak self] count in
-                guard let self, self.activeMode == .appWindowsOnly, shield.isShowing else { return }
+                guard let self, self.activeMode == .appWindowsOnly, self.windowShield?.isShowing == true else { return }
                 if count >= 1 { self.hidePanels() } else { self.showPanels() }
             }
             // No window yet (still launching): keep the whole screen covered until the first is tracked.
