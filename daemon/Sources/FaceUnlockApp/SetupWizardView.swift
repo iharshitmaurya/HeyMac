@@ -1,6 +1,65 @@
 import SwiftUI
 import FaceUnlockEngine
 
+/// Palette of the wizard design (light / dark).
+private enum WZ {
+    static let win = Color(light: 0xF5F5F7, dark: 0x1E1E20)
+    static let card = Color(light: 0xFFFFFF, dark: 0x2A2A2D)
+    static let ctl = Color(light: 0xFFFFFF, dark: 0x3A3A3E)
+    static let neu = Color(light: 0xE8E8ED, dark: 0x3A3A3E)
+    static let text2 = Color(light: 0x5F5F66, dark: 0xA9A9B1)
+    static let accent = Color(light: 0x0071E3, dark: 0x0A6FDC)
+    static let accentPressed = Color(light: 0x0857AD, dark: 0x0B5FBF)
+    static let accentTint = Color(light: 0xE4EFFC, dark: 0x1B2E48)
+    static let accentText = Color(light: 0x0062C9, dark: 0x62AEFF)
+    static let good = Color(light: 0x17692D, dark: 0x5FD47F)
+    static let goodBg = Color(light: 0xE1F3E6, dark: 0x1F3A29)
+    static let warn = Color(light: 0x8F5200, dark: 0xFFB340)
+    static let warnBg = Color(light: 0xFDEFD6, dark: 0x40311A)
+    static let bad = Color(light: 0xB92E26, dark: 0xFF7A70)
+    static let badFill = Color(light: 0xC0322A, dark: 0xD23B31)
+    static let disc = Color(light: 0x2A2D33, dark: 0x2A2D33)
+    static let logoTile = Color(light: 0xF6F8FC, dark: 0x2A2D33)
+    static let sep = Color.primary.opacity(0.12)
+    static let track = Color.primary.opacity(0.2)
+}
+
+private struct WizardButtonStyle: ButtonStyle {
+    enum Kind { case primary, secondary }
+    let kind: Kind
+
+    func makeBody(configuration: Configuration) -> some View {
+        WizardBody(configuration: configuration, kind: kind)
+    }
+
+    private struct WizardBody: View {
+        let configuration: ButtonStyleConfiguration
+        let kind: Kind
+        @Environment(\.isEnabled) private var isEnabled
+
+        var body: some View {
+            let shape = RoundedRectangle(cornerRadius: 8, style: .continuous)
+            configuration.label
+                .font(.system(size: 13, weight: .medium))
+                .lineLimit(1)
+                .padding(.horizontal, 16)
+                .frame(minWidth: kind == .primary ? 96 : 0, minHeight: 32)
+                .foregroundStyle(kind == .primary ? Color.white : Color.primary)
+                .background(fill, in: shape)
+                .overlay(shape.stroke(kind == .secondary ? Color.primary.opacity(0.2) : .clear, lineWidth: 1))
+                .opacity(isEnabled ? 1 : 0.4)
+        }
+
+        private var fill: Color {
+            let pressed = configuration.isPressed
+            switch kind {
+            case .primary: return pressed ? WZ.accentPressed : WZ.accent
+            case .secondary: return pressed ? Color.primary.opacity(0.12) : WZ.ctl
+            }
+        }
+    }
+}
+
 struct SetupWizardView: View {
     let flow: SetupFlow
 
@@ -11,19 +70,19 @@ struct SetupWizardView: View {
             header
             GeometryReader { geo in
                 ScrollView {
-                    VStack(alignment: .leading, spacing: Spacing.lg) { content }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.horizontal, Spacing.xl)
-                        .padding(.vertical, Spacing.lg)
-                        .frame(maxWidth: .infinity, minHeight: geo.size.height, alignment: .top)
+                    content
+                        .frame(maxWidth: 620)
+                        .padding(.horizontal, 48)
+                        .padding(.vertical, 12)
+                        .frame(maxWidth: .infinity, minHeight: geo.size.height,
+                               alignment: flow.step == .features ? .top : .center)
                 }
             }
-            Divider()
+            Rectangle().fill(WZ.sep).frame(height: 1)
             footer
         }
-        .frame(maxWidth: 520)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(nsColor: .windowBackgroundColor))
+        .background(WZ.win)
     }
 
     @ViewBuilder private var content: some View {
@@ -41,46 +100,45 @@ struct SetupWizardView: View {
 
     private var header: some View {
         let index = flow.step.rawValue
-        return VStack(alignment: .leading, spacing: Spacing.sm) {
-            Text("Step \(index + 1) of \(Self.stepCount)")
-                .font(Typography.caption).foregroundStyle(.secondary)
-                .lineLimit(1)
-            HStack(spacing: Spacing.xs) {
+        return VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 6) {
                 ForEach(0..<Self.stepCount, id: \.self) { i in
-                    Capsule().fill(i <= index ? Theme.accent : Color.primary.opacity(0.14))
+                    Capsule().fill(i <= index ? WZ.accent : WZ.track)
+                        .frame(maxWidth: .infinity)
                         .frame(height: 4)
                 }
             }
             .accessibilityHidden(true)
-            Text(flow.title).font(.title2).bold().lineLimit(1).minimumScaleFactor(0.8)
-                .padding(.top, Spacing.xs)
+            Text("Step \(index + 1) of \(Self.stepCount) · \(flow.title)")
+                .font(.system(size: 11)).foregroundStyle(WZ.text2).lineLimit(1)
         }
-        .padding(.horizontal, Spacing.xl)
-        .padding(.top, Spacing.lg)
-        .padding(.bottom, Spacing.sm)
+        .padding(.horizontal, 48)
+        .padding(.top, 16)
+        .padding(.bottom, 8)
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Step \(index + 1) of \(Self.stepCount): \(flow.title)")
     }
 
-    /// Pinned action bar: Back leading, secondary then primary trailing — the primary never moves.
+    /// Back on the left; secondary and primary actions on the right. The primary never moves.
     private var footer: some View {
-        HStack(spacing: Spacing.sm) {
+        HStack(spacing: 12) {
             if flow.canGoBack {
-                Button("Back") { flow.back() }.buttonStyle(PillButtonStyle(kind: .secondary))
+                Button("Back") { flow.back() }.buttonStyle(WizardButtonStyle(kind: .secondary))
             }
-            Spacer(minLength: Spacing.sm)
+            Spacer(minLength: 12)
             footerButtons
         }
-        .padding(.horizontal, Spacing.xl)
-        .padding(.vertical, Spacing.lg)
-        .frame(minHeight: 64)
+        .padding(.horizontal, 24)
+        .padding(.vertical, 16)
+        .frame(minHeight: 66)
+        .background(WZ.win)
     }
 
     @ViewBuilder private var footerButtons: some View {
         switch flow.step {
         case .welcome:
-            primary("Get Started") { flow.advance() }
+            primary("Continue") { flow.advance() }
         case .camera:
             if flow.cameraAuthorized {
                 primary("Continue") { flow.advance() }
@@ -88,7 +146,7 @@ struct SetupWizardView: View {
                 secondary("Check Again") { flow.refreshCameraStatus() }
                 primary("Open System Settings") { flow.model.openSystemSettings(anchor: "Privacy_Camera") }
             } else {
-                primary("Allow Camera Access") { flow.requestCamera() }
+                primary("Allow Camera") { flow.requestCamera() }
             }
         case .enroll:
             if flow.enrollFinished {
@@ -98,14 +156,18 @@ struct SetupWizardView: View {
                     .disabled(flow.enrolling)
             }
         case .test:
-            if flow.model.setupComplete {
-                secondary("Close") { flow.close() }
-                primary(flow.testing ? "Checking…" : "Test Now") { flow.runTest() }.disabled(flow.testing)
+            if flow.testing {
+                primary("Checking…") {}.disabled(true)
+            } else if flow.testMessage == nil {
+                primary("Test Now") { flow.runTest() }
             } else if flow.testPassed {
-                secondary(flow.testing ? "Checking…" : "Test Again") { flow.runTest() }.disabled(flow.testing)
-                primary("Continue") { flow.advance() }
+                if flow.model.setupComplete { secondary("Test Again") { flow.runTest() } }
+                primary(flow.model.setupComplete ? "Done" : "Continue") {
+                    flow.model.setupComplete ? flow.close() : flow.advance()
+                }
             } else {
-                primary(flow.testing ? "Checking…" : "Test Now") { flow.runTest() }.disabled(flow.testing)
+                secondary("Re-enroll") { flow.restartEnrollment() }
+                primary("Try Again") { flow.runTest() }
             }
         case .features:
             primary("Continue") { flow.advance() }
@@ -115,248 +177,337 @@ struct SetupWizardView: View {
     }
 
     private func primary(_ title: String, action: @escaping () -> Void) -> some View {
-        Button(title, action: action).buttonStyle(PillButtonStyle(kind: .primary)).keyboardShortcut(.defaultAction)
+        Button(title, action: action).buttonStyle(WizardButtonStyle(kind: .primary)).keyboardShortcut(.defaultAction)
     }
 
     private func secondary(_ title: String, action: @escaping () -> Void) -> some View {
-        Button(title, action: action).buttonStyle(PillButtonStyle(kind: .secondary))
+        Button(title, action: action).buttonStyle(WizardButtonStyle(kind: .secondary))
     }
 
-    /// Status line: colored icon plus text in the adaptive text color, wrapping allowed.
-    private func banner(_ text: String, icon: String, tone: StatusChip.Tone) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: Spacing.sm) {
-            Image(systemName: icon).foregroundStyle(tone.color).accessibilityHidden(true)
-            Text(text).foregroundStyle(tone.textColor).fixedSize(horizontal: false, vertical: true)
-        }
+    // MARK: - Shared pieces
+
+    private func h1(_ text: String, size: CGFloat = 22) -> some View {
+        Text(text).font(.system(size: size, weight: .semibold)).lineLimit(2).multilineTextAlignment(.center)
     }
 
-    private func point(_ text: String, icon: String) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: Spacing.md) {
-            Image(systemName: icon).foregroundStyle(Theme.accentText)
-                .frame(width: 22).accessibilityHidden(true)
-            Text(text).fixedSize(horizontal: false, vertical: true)
+    private func bodyText(_ text: String) -> some View {
+        Text(text).font(.system(size: 13)).foregroundStyle(WZ.text2)
+            .lineSpacing(4).multilineTextAlignment(.center)
+            .frame(maxWidth: 420).fixedSize(horizontal: false, vertical: true)
+    }
+
+    private func circleIcon(_ symbol: String, tint: Color, bg: Color) -> some View {
+        Image(systemName: symbol)
+            .font(.system(size: 30, weight: .regular)).foregroundStyle(tint)
+            .frame(width: 72, height: 72).background(bg, in: Circle())
+            .accessibilityHidden(true)
+    }
+
+    private func tile(_ symbol: String, size: CGFloat = 28) -> some View {
+        Image(systemName: symbol)
+            .font(.system(size: size * 0.5, weight: .medium)).foregroundStyle(WZ.accentText)
+            .frame(width: size, height: size)
+            .background(WZ.accentTint, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .accessibilityHidden(true)
+    }
+
+    private func chip(_ text: String, icon: String, fg: Color, bg: Color) -> some View {
+        HStack(spacing: 4) {
+            Image(systemName: icon).font(.system(size: 9, weight: .bold))
+            Text(text).font(.system(size: 11, weight: .semibold))
         }
+        .foregroundStyle(fg)
+        .padding(.horizontal, 8).frame(height: 20)
+        .background(bg, in: Capsule())
+    }
+
+    private func feature(_ symbol: String, _ title: String, _ caption: String) -> some View {
+        VStack(spacing: 6) {
+            tile(symbol, size: 36)
+            Text(title).font(.system(size: 13, weight: .semibold)).lineLimit(1)
+            Text(caption).font(.system(size: 11)).foregroundStyle(WZ.text2)
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    private func badge(good: Bool) -> some View {
+        Image(systemName: good ? "checkmark" : "xmark")
+            .font(.system(size: 15, weight: .bold)).foregroundStyle(.white)
+            .frame(width: 36, height: 36)
+            .background(good ? WZ.good : WZ.badFill, in: Circle())
+            .overlay(Circle().stroke(WZ.win, lineWidth: 3))
+    }
+
+    /// Always on the dark disc, so fixed light text.
+    private var cameraOffLabel: some View {
+        VStack(spacing: 6) {
+            Image(systemName: "video.slash").font(.system(size: 22)).accessibilityHidden(true)
+            Text("Camera off").font(.system(size: 13, weight: .semibold))
+        }
+        .foregroundStyle(Color.white.opacity(0.85))
+    }
+
+    private func preview(diameter: CGFloat) -> some View {
+        ZStack {
+            Circle().fill(WZ.disc)
+            if let image = flow.preview {
+                Image(decorative: image, scale: 1)
+                    .resizable().aspectRatio(contentMode: .fill)
+                    .scaleEffect(x: -1, y: 1) // mirror, so moving left looks left
+                    .frame(width: diameter, height: diameter)
+                    .clipShape(Circle())
+            } else {
+                cameraOffLabel
+            }
+        }
+        .frame(width: diameter, height: diameter)
     }
 
     // MARK: - Steps
 
     private var welcome: some View {
-        VStack(alignment: .leading, spacing: Spacing.lg) {
-            Image(systemName: "faceid").font(.system(size: 52)).foregroundStyle(Theme.accent)
+        VStack(spacing: 8) {
+            Image(systemName: "faceid")
+                .font(.system(size: 44, weight: .regular)).foregroundStyle(WZ.accent)
+                .frame(width: 88, height: 88)
+                .background(WZ.logoTile, in: RoundedRectangle(cornerRadius: 19, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: 19, style: .continuous).stroke(Color.primary.opacity(0.1), lineWidth: 1))
                 .accessibilityHidden(true)
-            Text("Unlock your Mac's lock screen by looking at the camera.")
-            point("Your face stays on this Mac, stored encrypted as numbers — not photos.", icon: "lock.shield")
-            point("Your password always keeps working. Face unlock is only a shortcut.", icon: "key")
-            point("The camera runs only while a check is happening.", icon: "video")
+            h1("Welcome to FaceUnlock", size: 28).padding(.top, 8)
+            bodyText("Unlock your lock screen and the apps you choose, just by looking at your Mac.")
+            HStack(alignment: .top, spacing: 16) {
+                feature("checkmark.shield", "Stays on your Mac", "Nothing is uploaded.")
+                feature("photo", "No photos kept", "Only a small fingerprint.")
+                feature("bolt.fill", "Quick to set up", "About a minute.")
+            }
+            .frame(maxWidth: 560).padding(.top, 24)
         }
     }
 
     private var camera: some View {
-        VStack(alignment: .leading, spacing: Spacing.lg) {
-            Text("FaceUnlock needs the camera to recognize you.")
+        VStack(spacing: 12) {
             if flow.cameraAuthorized {
-                banner("Camera access granted.", icon: "checkmark.circle.fill", tone: .good)
+                circleIcon("checkmark", tint: WZ.good, bg: WZ.goodBg)
+                h1("Camera access allowed")
+                bodyText("Face Unlock can see you when you unlock. Photos are never saved, and nothing leaves your Mac.")
             } else if flow.cameraDenied {
-                banner("Camera access was denied.", icon: "exclamationmark.triangle.fill", tone: .warn)
-                CaptionText("Turn it on in System Settings, then come back to this window.")
+                circleIcon("exclamationmark.triangle", tint: WZ.warn, bg: WZ.warnBg)
+                h1("Camera access is off")
+                bodyText("Face Unlock can’t see you without it. Turn it on in System Settings, under Privacy & Security, then Camera.")
+                chip("Permission denied", icon: "exclamationmark.triangle.fill", fg: WZ.warn, bg: WZ.warnBg)
+            } else {
+                circleIcon("camera", tint: WZ.accentText, bg: WZ.accentTint)
+                h1("Allow camera access")
+                bodyText("Face Unlock uses the camera only to see your face when you unlock. Photos are never saved, and nothing leaves your Mac.")
             }
         }
     }
 
     private var enroll: some View {
-        VStack(spacing: Spacing.lg) {
-            Text("Look straight at the camera in good, even light.")
-                .frame(maxWidth: .infinity, alignment: .leading)
-            enrollPreview
-            sampleDots
-            Text(flow.enrollHint)
-                .font(.system(size: 13))
-                .foregroundStyle(hintColor)
+        VStack(spacing: 8) {
+            Text("Enroll your face").font(.system(size: 17, weight: .semibold))
+            enrollRing
+            Text(enrollHeadline).font(.system(size: 13, weight: .medium))
+                .foregroundStyle(hintColor).multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+            Text(enrollSubline).font(.system(size: 11)).foregroundStyle(WZ.text2)
                 .multilineTextAlignment(.center)
-                .frame(maxWidth: .infinity, minHeight: 40, alignment: .top)
         }
+    }
+
+    private var enrollHeadline: String {
+        if flow.enrollFinished { return "All set. That’s all \(flow.sampleTarget) samples." }
+        return flow.enrollHint.isEmpty ? "Hold still and look straight at the camera." : flow.enrollHint
+    }
+
+    private var enrollSubline: String {
+        if flow.enrollFinished { return "Your face is saved on this Mac." }
+        if flow.enrolling { return "Sample \(min(flow.samplesCaptured + 1, flow.sampleTarget)) of \(flow.sampleTarget). Turn your head slowly." }
+        return "We’ll take \(flow.sampleTarget) quick samples in good, even light."
     }
 
     private var hintColor: Color {
         switch flow.enrollHintTone {
-        case .neutral: return .secondary
-        case .good: return Theme.goodText
-        case .warn: return Theme.warnText
+        case .neutral: return .primary
+        case .good: return WZ.good
+        case .warn: return WZ.warn
         }
     }
 
-    /// The circular preview, ringed by one continuous progress arc that closes as live
-    /// samples come in, ending in a checkmark that draws itself in
-    /// pose-tracked tick ring (we don't guide head turns, just take 8 live samples), but
-    /// the same idea of "progress you can see without reading a number."
-    private var enrollPreview: some View {
-        ZStack {
-            Circle().fill(.black.opacity(0.85))
-                .frame(width: 220, height: 220)
-
-            if let image = flow.preview, !flow.enrollFinished {
-                Image(decorative: image, scale: 1)
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-                    .scaleEffect(x: -1, y: 1) // mirror, so moving left looks left
-                    .frame(width: 220, height: 220)
-                    .clipShape(Circle())
-            } else if !flow.enrollFinished {
-                cameraOffLabel(nil)
-            }
-
-            Circle()
-                .stroke(Color.primary.opacity(0.1), lineWidth: 6)
-                .frame(width: 236, height: 236)
-            Circle()
-                .trim(from: 0, to: enrollProgress)
-                .stroke(Theme.accent, style: StrokeStyle(lineWidth: 6, lineCap: .round))
-                .frame(width: 236, height: 236)
-                .rotationEffect(.degrees(-90))
+    /// The live preview inside a progress ring with one dot per sample.
+    private var enrollRing: some View {
+        let progress = flow.sampleTarget > 0 ? Double(flow.samplesCaptured) / Double(flow.sampleTarget) : 0
+        return ZStack {
+            Circle().stroke(Color.primary.opacity(0.1), lineWidth: 4).frame(width: 246, height: 246)
+            Circle().trim(from: 0, to: progress)
+                .stroke(WZ.accent, style: StrokeStyle(lineWidth: 4, lineCap: .round))
+                .frame(width: 246, height: 246).rotationEffect(.degrees(-90))
                 .animation(.easeInOut(duration: 0.3), value: flow.samplesCaptured)
-
+            ForEach(0..<max(flow.sampleTarget, 1), id: \.self) { i in
+                let angle = Double(i) / Double(max(flow.sampleTarget, 1)) * 2 * .pi
+                Circle().fill(i < flow.samplesCaptured ? WZ.accent : WZ.track)
+                    .frame(width: 6, height: 6)
+                    .offset(x: 123 * sin(angle), y: -123 * cos(angle))
+            }
+            preview(diameter: 220)
             if flow.enrollFinished {
-                ZStack {
-                    Circle().fill(Theme.good.opacity(0.16)).frame(width: 74, height: 74)
-                    CheckmarkShape()
-                        .trim(from: 0, to: flow.enrollFinished ? 1 : 0)
-                        .stroke(Theme.good, style: StrokeStyle(lineWidth: 7, lineCap: .round, lineJoin: .round))
-                        .frame(width: 34, height: 34)
-                }
-                .transition(.scale(scale: 0.6).combined(with: .opacity))
-                .animation(.easeOut(duration: 0.45), value: flow.enrollFinished)
+                badge(good: true).offset(x: 86, y: 86).transition(.scale.combined(with: .opacity))
             }
         }
-        .frame(width: 236, height: 236)
+        .frame(width: 264, height: 264)
+        .animation(.easeOut(duration: 0.3), value: flow.enrollFinished)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Enrollment progress")
         .accessibilityValue("\(flow.samplesCaptured) of \(flow.sampleTarget) samples")
     }
 
-    private var enrollProgress: Double {
-        flow.sampleTarget > 0 ? Double(flow.samplesCaptured) / Double(flow.sampleTarget) : 0
-    }
-
-    /// One dot per sample, filled as each one lands — discrete progress a pose-tracked
-    /// ring doesn't need to show, since we're not confirming a head direction, just a count.
-    private var sampleDots: some View {
-        HStack(spacing: 8) {
-            ForEach(0..<flow.sampleTarget, id: \.self) { index in
-                Circle()
-                    .fill(index < flow.samplesCaptured ? Theme.accent : Color.primary.opacity(0.14))
-                    .frame(width: 7, height: 7)
-                    .scaleEffect(index == flow.samplesCaptured - 1 ? 1.4 : 1)
-                    .animation(.spring(response: 0.32, dampingFraction: 0.55), value: flow.samplesCaptured)
-            }
-        }
-    }
-
     private var test: some View {
-        VStack(spacing: Spacing.lg) {
-            Text("Look at the camera, then press Test Now.")
-                .frame(maxWidth: .infinity, alignment: .leading)
-            testPreview
-            VStack(spacing: Spacing.sm) {
-                MatchFeedbackView(state: matchState)
-                Text(matchCaption)
-                    .font(.system(size: 13)).foregroundStyle(matchColor)
-                    .multilineTextAlignment(.center)
-                    .frame(maxWidth: .infinity, minHeight: 40, alignment: .top)
+        let done = !flow.testing && flow.testMessage != nil
+        return VStack(spacing: 8) {
+            Text("Check that it recognizes you").font(.system(size: 17, weight: .semibold))
+            ZStack {
+                Circle().stroke(ringColor, lineWidth: 4).frame(width: 186, height: 186)
+                preview(diameter: 170)
+                if done { badge(good: flow.testPassed).offset(x: 66, y: 66) }
             }
+            .frame(width: 190, height: 190)
+            .animation(.easeOut(duration: 0.3), value: flow.testPassed)
+            Text(testHeadline).font(.system(size: 13, weight: .medium))
+                .foregroundStyle(testColor).multilineTextAlignment(.center)
+            Text(testSubline).font(.system(size: 11)).foregroundStyle(WZ.text2)
+                .multilineTextAlignment(.center).frame(maxWidth: 340)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 
-    private var matchState: MatchState {
-        if flow.testing { return .idle }
-        if flow.testMessage != nil { return flow.testPassed ? .success : .fail }
-        return .idle
+    private var ringColor: Color {
+        if flow.testing || flow.testMessage == nil { return WZ.accent.opacity(0.35) }
+        return flow.testPassed ? WZ.good : WZ.badFill
     }
 
-    private var matchCaption: String {
-        if flow.testing { return "Scanning…" }
-        return flow.testMessage ?? ""
+    private var testHeadline: String {
+        if flow.testing { return "Looking for your face…" }
+        if flow.testMessage == nil { return "Ready when you are." }
+        return flow.testPassed ? "It’s you!" : "We couldn’t match your face."
     }
 
-    private var matchColor: Color {
-        if flow.testing || flow.testMessage == nil { return .secondary }
-        return flow.testPassed ? Theme.goodText : Theme.badText
+    private var testSubline: String {
+        if flow.testing { return "Look at the camera." }
+        if flow.testMessage == nil { return "Look at the camera, then press Test Now." }
+        return flow.testPassed
+            ? "Face Unlock is working."
+            : "Try facing the camera in better light. If it keeps happening, enroll again."
     }
 
-    private var testPreview: some View {
-        ZStack {
-            Circle().fill(.black.opacity(0.85)).frame(width: 220, height: 220)
-            if let image = flow.preview {
-                Image(decorative: image, scale: 1)
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-                    .scaleEffect(x: -1, y: 1)
-                    .frame(width: 220, height: 220)
-                    .clipShape(Circle())
-            } else {
-                cameraOffLabel("Press Test Now to start")
-            }
-            Circle().stroke(Color.primary.opacity(0.1), lineWidth: 6).frame(width: 236, height: 236)
-        }
-        .frame(width: 236, height: 236)
-    }
-
-    /// Always on the black disc, so fixed light text — never `.secondary`, which is dark in light mode.
-    private func cameraOffLabel(_ detail: String?) -> some View {
-        VStack(spacing: Spacing.xs) {
-            Image(systemName: "video.slash").font(.system(size: 22)).accessibilityHidden(true)
-            Text("Camera off").font(.system(size: 13, weight: .semibold))
-            if let detail { Text(detail).font(Typography.caption) }
-        }
-        .foregroundStyle(Color.white.opacity(0.85))
-        .multilineTextAlignment(.center)
-        .padding(.horizontal, Spacing.xl)
+    private var testColor: Color {
+        if flow.testing || flow.testMessage == nil { return .primary }
+        return flow.testPassed ? WZ.good : WZ.bad
     }
 
     private var features: some View {
-        VStack(alignment: .leading, spacing: Spacing.lg) {
-            VStack(alignment: .leading, spacing: Spacing.sm) {
-                Text("Unlock the lock screen with my face").bold()
-                CaptionText("FaceUnlock types your login password for you when it recognizes your face. It needs your password stored, encrypted, on this Mac.")
-                SecureField("Login password", text: Binding(get: { flow.password }, set: { flow.password = $0 }))
-                    .textFieldStyle(.roundedBorder)
-                SecureField("Confirm password", text: Binding(get: { flow.passwordConfirm }, set: { flow.passwordConfirm = $0 }))
-                    .textFieldStyle(.roundedBorder)
-                secondary("Save Password") { flow.saveLoginPassword() }
-                    .disabled(flow.password.isEmpty || flow.passwordConfirm.isEmpty)
-                if let message = flow.passwordMessage {
-                    banner(message, icon: message == "Password saved." ? "checkmark.circle.fill" : "exclamationmark.circle.fill",
-                           tone: message == "Password saved." ? .good : .warn)
-                        .font(Typography.caption)
+        VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Turn on what you want").font(.system(size: 22, weight: .semibold))
+                Text("You can change any of this later in Settings.")
+                    .font(.system(size: 11)).foregroundStyle(WZ.text2)
+            }
+            VStack(spacing: 0) {
+                lockScreenRow
+                Rectangle().fill(WZ.sep).frame(height: 1)
+                accessibilityRow
+            }
+            .background(WZ.card, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).stroke(WZ.sep, lineWidth: 1))
+        }
+    }
+
+    private var lockScreenOn: Bool { flow.model.lockScreenEnabled || flow.lockScreenWanted }
+
+    private var lockScreenRow: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 12) {
+                tile("lock.fill")
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Unlock the lock screen").font(.system(size: 13, weight: .medium)).lineLimit(1)
+                    Text(flow.passwordMessage ?? "Needs your login password. It stays on this Mac.")
+                        .font(.system(size: 11)).foregroundStyle(passwordMessageColor)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
-                if flow.model.lockScreenEnabled {
-                    if flow.model.accessibilityTrusted {
-                        banner("Accessibility permission granted.", icon: "checkmark.circle.fill", tone: .good)
-                    } else {
-                        banner("Needs Accessibility permission to type the password.", icon: "exclamationmark.triangle.fill", tone: .warn)
-                        secondary("Grant Accessibility Permission") { flow.model.requestAccessibility() }
+                Spacer(minLength: 8)
+                Toggle("Unlock the lock screen", isOn: Binding(
+                    get: { lockScreenOn },
+                    set: { flow.setLockScreenWanted($0) }
+                ))
+                .toggleStyle(.switch).labelsHidden().tint(WZ.accent)
+            }
+            .padding(.horizontal, 16).padding(.vertical, 10).frame(minHeight: 48)
+
+            if flow.lockScreenWanted && !flow.model.lockScreenEnabled {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(alignment: .top, spacing: 12) {
+                        passwordField("Login password", text: Binding(get: { flow.password }, set: { flow.password = $0 }))
+                        passwordField("Confirm password", text: Binding(get: { flow.passwordConfirm }, set: { flow.passwordConfirm = $0 }))
+                    }
+                    HStack {
+                        secondary("Save Password") { flow.saveLoginPassword() }
+                            .disabled(flow.password.isEmpty || flow.passwordConfirm.isEmpty)
+                        Spacer(minLength: 0)
                     }
                 }
+                .padding(.horizontal, 16).padding(.bottom, 12)
             }
         }
     }
 
+    private var passwordMessageColor: Color {
+        guard let message = flow.passwordMessage else { return WZ.text2 }
+        return message == "Password saved." ? WZ.good : WZ.warn
+    }
+
+    private func passwordField(_ label: String, text: Binding<String>) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(label).font(.system(size: 11)).foregroundStyle(WZ.text2)
+            SecureField("", text: text)
+                .textFieldStyle(.plain).font(.system(size: 13))
+                .padding(.horizontal, 8).frame(height: 28)
+                .background(WZ.ctl, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).stroke(Color.primary.opacity(0.2), lineWidth: 1))
+                .accessibilityLabel(label)
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    private var accessibilityRow: some View {
+        HStack(spacing: 12) {
+            tile("keyboard")
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Accessibility").font(.system(size: 13, weight: .medium)).lineLimit(1)
+                Text("Lets Face Unlock press keys on the lock screen.")
+                    .font(.system(size: 11)).foregroundStyle(WZ.text2)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 8)
+            if flow.model.accessibilityTrusted {
+                chip("Allowed", icon: "checkmark", fg: WZ.good, bg: WZ.goodBg)
+            } else {
+                chip("Needs permission", icon: "exclamationmark.triangle.fill", fg: WZ.warn, bg: WZ.warnBg)
+                secondary("Open Settings") { flow.model.requestAccessibility() }
+            }
+        }
+        .padding(.horizontal, 16).padding(.vertical, 10).frame(minHeight: 48)
+    }
+
     private var done: some View {
-        VStack(alignment: .leading, spacing: Spacing.lg) {
-            banner("FaceUnlock is ready.", icon: "checkmark.seal.fill", tone: .good)
-            Text("Look for the face icon in the menu bar. From there you can pause it or open Settings, where you can also test it, lock apps with App Lock, or set it up again.")
+        VStack(spacing: 12) {
+            circleIcon("checkmark", tint: WZ.good, bg: WZ.goodBg)
+            h1("You’re set")
+            bodyText("Look at your Mac when you wake the screen. Add apps to lock any time in Settings.")
+            HStack(alignment: .top, spacing: 12) {
+                feature("lock.fill", "Lock screen", "Wake your Mac and look.")
+                feature("lock.app.dashed", "App Lock", "Add apps in Settings.")
+            }
+            .frame(maxWidth: 420).padding(.top, 16)
         }
     }
-
-    /// A hand-drawn checkmark path, traced in via `.trim` rather than an SF Symbol —
-    /// the enrollment ring closing into a check that draws itself is the payoff moment.
-    private struct CheckmarkShape: Shape {
-        func path(in rect: CGRect) -> Path {
-            var path = Path()
-            path.move(to: CGPoint(x: rect.minX + rect.width * 0.16, y: rect.minY + rect.height * 0.52))
-            path.addLine(to: CGPoint(x: rect.minX + rect.width * 0.42, y: rect.minY + rect.height * 0.78))
-            path.addLine(to: CGPoint(x: rect.minX + rect.width * 0.86, y: rect.minY + rect.height * 0.2))
-            return path
-        }
-    }
-
 }

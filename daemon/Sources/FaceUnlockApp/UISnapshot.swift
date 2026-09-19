@@ -34,7 +34,7 @@ enum UISnapshot {
 
         let stepNames = ["welcome", "camera", "enroll", "test", "features", "done"]
         for step in SetupFlow.Step.allCases {
-            for (w, h) in [(520, 560), (640, 700)] {
+            for (w, h) in [(720, 540), (900, 700)] {
                 each { () -> SetupWizardView in
                     let flow = SetupFlow(model: model, startAt: step)
                     flow.cameraAuthorized = true

@@ -38,6 +38,9 @@ final class SetupFlow {
     var password = ""
     var passwordConfirm = ""
     var passwordMessage: String?
+    /// The lock-screen switch on the features step. On by default so its password fields are
+    /// visible; it only takes effect once a password is saved.
+    var lockScreenWanted = true
 
     var preview: CGImage?
     private var previewTimer: Timer?
@@ -57,7 +60,7 @@ final class SetupFlow {
         case .camera: return "Camera access"
         case .enroll: return "Enroll your face"
         case .test: return "Check that it recognizes you"
-        case .features: return "Lock-screen unlock"
+        case .features: return "Turn on what you want"
         case .done: return "You're set"
         }
     }
@@ -192,6 +195,38 @@ final class SetupFlow {
         passwordConfirm = ""
         passwordMessage = "Password saved."
         model.setLockScreenEnabled(true)
+    }
+
+    /// Flips the lock-screen switch. With a saved password it applies at once; without one the
+    /// password fields appear and saving them turns it on.
+    func setLockScreenWanted(_ wanted: Bool) {
+        lockScreenWanted = wanted
+        if wanted {
+            if model.runtime?.hasLoginPassword ?? false { model.setLockScreenEnabled(true) }
+        } else if model.lockScreenEnabled {
+            model.setLockScreenEnabled(false)
+        }
+    }
+
+    /// "Re-enroll" on a failed test: back to the enroll step with a clean slate.
+    func restartEnrollment() {
+        // In the standalone Test window the app is already set up; re-enroll must go through the
+        // normal path (it pauses the engine and frees the camera first).
+        if model.setupComplete {
+            close()
+            model.reEnroll()
+            return
+        }
+        advanceTask?.cancel()
+        enrolling = false
+        enrollFinished = false
+        samplesCaptured = 0
+        enrollHint = ""
+        enrollHintTone = .neutral
+        testMessage = nil
+        testPassed = false
+        step = .enroll
+        startPreview()
     }
 
     // MARK: - Navigation
