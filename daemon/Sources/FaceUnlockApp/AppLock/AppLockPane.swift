@@ -39,6 +39,23 @@ struct AppLockPane: View {
         .background(Color.primary.opacity(0.05))
         .clipShape(RoundedRectangle(cornerRadius: 12))
 
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text("Shield style").font(.system(size: 13, weight: .semibold))
+                Spacer()
+                Picker("", selection: Binding(get: { model.shieldMode }, set: { model.setShieldMode($0) })) {
+                    ForEach(ShieldMode.allCases) { Text($0.title).tag($0) }
+                }
+                .labelsHidden().pickerStyle(.segmented).frame(width: 260)
+            }
+            Text("Only the locked app blurs just that app's windows. It can lag slightly if you drag the window, and a new window may show for an instant before it is covered. Whole screen is the strongest.")
+                .font(.system(size: 11.5)).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(.horizontal, 14).padding(.vertical, 12)
+        .background(Color.primary.opacity(0.05))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+
         if model.appLockEnabled {
             Text(AppLockAgent.statusText).font(.system(size: 11.5)).foregroundStyle(.secondary)
         }

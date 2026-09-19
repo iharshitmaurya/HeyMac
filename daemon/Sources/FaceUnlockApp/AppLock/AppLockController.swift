@@ -99,7 +99,8 @@ final class AppLockController {
         activeApp = app
         shield.model.onRetry = { [weak self] in self?.retry() }
         shield.model.onQuitApp = { [weak self] in self?.quitActiveApp() }
-        shield.present(appName: app.localizedName ?? app.bundleIdentifier ?? "App", icon: app.icon)
+        shield.present(appName: app.localizedName ?? app.bundleIdentifier ?? "App", icon: app.icon,
+                       pid: app.processIdentifier, mode: ShieldMode.saved)
         // Us, not the locked app, must be frontmost so keystrokes can't reach it.
         NSApp.activate(ignoringOtherApps: true)
         startAuthentication(for: app)

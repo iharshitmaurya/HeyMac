@@ -35,7 +35,10 @@ private final class ShieldPanel: NSPanel {
 @MainActor
 final class ShieldController {
     let model = ShieldModel()
-    private(set) var isShowing = false
+    var isShowing: Bool { panelsUp || (windowShield?.isShowing ?? false) }
+    private var panelsUp = false
+    private var activeMode: ShieldMode = .fullScreen
+    private var windowShield: AppWindowShield?
     private var panels: [CGDirectDisplayID: ShieldPanel] = [:]
     private var generation = 0
     private var screenObserver: NSObjectProtocol?
@@ -44,7 +47,7 @@ final class ShieldController {
         screenObserver = NotificationCenter.default.addObserver(
             forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main
         ) { [weak self] _ in
-            MainActor.assumeIsolated { self?.syncPanels(orderFront: self?.isShowing ?? false) }
+            MainActor.assumeIsolated { self?.syncPanels(orderFront: self?.panelsUp ?? false) }
         }
     }
 
@@ -52,7 +55,7 @@ final class ShieldController {
         syncPanels(orderFront: false)
     }
 
-    func present(appName: String, icon: NSImage?) {
+    func present(appName: String, icon: NSImage?, pid: pid_t, mode: ShieldMode) {
         model.appName = appName
         model.icon = icon
         model.phase = .scanning
@@ -60,14 +63,37 @@ final class ShieldController {
         let primary = NSScreen.screens.first { NSMouseInRect(mouse, $0.frame, false) } ?? NSScreen.main
         model.primaryDisplayID = primary?.displayID
         generation += 1
-        isShowing = true
+        activeMode = mode == .appWindowsOnly && pid > 0 ? .appWindowsOnly : .fullScreen
         for panel in panels.values { panel.alphaValue = 1 }
+        if activeMode == .appWindowsOnly {
+            let shield = windowShield ?? AppWindowShield(model: model)
+            windowShield = shield
+            shield.onWindowCountChange = { [weak self] count in
+                guard let self, self.activeMode == .appWindowsOnly, shield.isShowing else { return }
+                if count >= 1 { self.hidePanels() } else { self.showPanels() }
+            }
+            // No window yet (still launching): keep the whole screen covered until the first is tracked.
+            if WindowTracker.windows(forPID: pid).isEmpty { showPanels() }
+            shield.present(pid: pid)
+        } else {
+            showPanels()
+        }
+    }
+
+    private func showPanels() {
+        panelsUp = true
         syncPanels(orderFront: true)
-        if let id = primary?.displayID { panels[id]?.makeKey() }
+        if let id = model.primaryDisplayID { panels[id]?.makeKey() }
+    }
+
+    private func hidePanels() {
+        panelsUp = false
+        for panel in panels.values { panel.orderOut(nil) }
     }
 
     func dismiss() {
-        isShowing = false
+        panelsUp = false
+        windowShield?.dismiss()
         generation += 1
         let mine = generation
         let fading = Array(panels.values)
@@ -99,7 +125,7 @@ final class ShieldController {
         }
         // The content display may have been unplugged; move it to a live one so the
         // message and buttons stay reachable.
-        if isShowing, model.primaryDisplayID.map({ !seen.contains($0) }) ?? true,
+        if panelsUp, model.primaryDisplayID.map({ !seen.contains($0) }) ?? true,
            let id = NSScreen.main?.displayID ?? seen.first {
             model.primaryDisplayID = id
             panels[id]?.makeKey()

@@ -31,6 +31,7 @@ final class AppModel {
     private(set) var animationStyle = UnlockAnimationStyle.saved
     private(set) var appLockEnabled = false
     private(set) var appLockApps: [LockedApp] = []
+    private(set) var shieldMode = ShieldMode.saved
     private(set) var pamStatus: PamStatus = .notInstalled
     private(set) var accessibilityTrusted = false
     private(set) var cameraAuthorized = false
@@ -250,6 +251,11 @@ final class AppModel {
             controller.store.remove(bundleID: bundleID)
             reloadSettings()
         }
+    }
+
+    func setShieldMode(_ mode: ShieldMode) {
+        ShieldMode.saved = mode
+        shieldMode = mode
     }
 
     func setLockedAppPolicy(_ policy: RelockPolicy, for bundleID: String) {
