@@ -36,11 +36,13 @@ struct ShieldBlur: NSViewRepresentable {
 struct ShieldView: View {
     let model: ShieldModel
     let displayID: CGDirectDisplayID
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
     var body: some View {
         ZStack {
             ShieldBlur()
-            Color.black.opacity(ShieldStyle.tint)
+            // Reduce Transparency makes the blur a flat fill; darken it so the white text stays readable.
+            Color.black.opacity(reduceTransparency ? max(ShieldStyle.tint, 0.6) : ShieldStyle.tint)
             if model.primaryDisplayID == displayID { ShieldContent(model: model) }
         }
         .ignoresSafeArea()
@@ -48,28 +50,78 @@ struct ShieldView: View {
 
 }
 
+/// Shield-only button look: the scrim is always dark, whatever the system appearance.
+private struct ShieldButtonStyle: ButtonStyle {
+    let primary: Bool
+    @Environment(\.isEnabled) private var isEnabled
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.system(size: 12.5, weight: .semibold))
+            .lineLimit(1)
+            .fixedSize(horizontal: true, vertical: false)
+            .padding(.horizontal, Spacing.lg)
+            .padding(.vertical, 7)
+            .background(primary ? Theme.accent : Color.white.opacity(configuration.isPressed ? 0.28 : 0.16))
+            .foregroundStyle(primary ? Theme.accentInk : Color.white)
+            .clipShape(Capsule())
+            .overlay(Capsule().stroke(primary ? .clear : Color.white.opacity(0.4), lineWidth: 1))
+            .opacity(isEnabled ? (configuration.isPressed && primary ? 0.85 : 1) : 0.45)
+    }
+}
+
 /// The centered text and buttons, shared by the whole-screen and the app-only shield.
+/// The headline is constant; only the status line below it changes with the phase.
 struct ShieldContent: View {
     let model: ShieldModel
 
+    private var status: String {
+        switch model.phase {
+        case .scanning: return "Looking for your face…"
+        case .needsAuth(let message): return message
+        case .unlocked: return "Unlocked"
+        }
+    }
+
     var body: some View {
-        VStack(spacing: 14) {
+        VStack(spacing: Spacing.md + Spacing.xs / 2) {
             Text("Face Unlock Required\nto open \(model.appName)")
                 .font(.system(size: 26, weight: .regular))
-                .lineSpacing(8)
+                .lineSpacing(Spacing.sm)
                 .multilineTextAlignment(.center)
                 .foregroundStyle(.white)
-            if case .needsAuth(let message) = model.phase {
-                Text(message)
-                    .font(.system(size: 13))
-                    .foregroundStyle(.white.opacity(0.6))
-                HStack(spacing: 10) {
-                    Button("Try Again") { model.onRetry() }.buttonStyle(PillButtonStyle(kind: .primary))
-                    Button("Quit App") { model.onQuitApp() }.buttonStyle(PillButtonStyle(kind: .secondary))
+            HStack(spacing: Spacing.sm) {
+                switch model.phase {
+                case .scanning:
+                    ProgressView().controlSize(.small).colorScheme(.dark)
+                case .unlocked:
+                    Image(systemName: "checkmark.circle.fill").foregroundStyle(Theme.good)
+                case .needsAuth:
+                    EmptyView()
                 }
-                .padding(.top, 6)
+                Text(status)
+                    .font(.system(size: 13))
+                    .foregroundStyle(.white.opacity(0.75))
+                    .multilineTextAlignment(.center)
+            }
+            .frame(minHeight: 20)
+            if case .needsAuth = model.phase {
+                HStack(spacing: Spacing.sm + 2) {
+                    // Return retries; nothing on the shield is bound to Escape, so it can't be dismissed.
+                    Button("Try Again") { model.onRetry() }
+                        .buttonStyle(ShieldButtonStyle(primary: true))
+                        .keyboardShortcut(.defaultAction)
+                        .accessibilityLabel("Try again")
+                    Button("Quit App") { model.onQuitApp() }
+                        .buttonStyle(ShieldButtonStyle(primary: false))
+                        .accessibilityLabel("Quit \(model.appName)")
+                }
+                .padding(.top, Spacing.xs + 2)
             }
         }
         .shadow(color: .black.opacity(0.35), radius: 6)
+        .environment(\.colorScheme, .dark)
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Face Unlock required to open \(model.appName). \(status)")
     }
 }
