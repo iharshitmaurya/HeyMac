@@ -41,12 +41,18 @@ struct ShieldView: View {
         ZStack {
             ShieldBlur()
             Color.black.opacity(ShieldStyle.tint)
-            if model.primaryDisplayID == displayID { content }
+            if model.primaryDisplayID == displayID { ShieldContent(model: model) }
         }
         .ignoresSafeArea()
     }
 
-    private var content: some View {
+}
+
+/// The centered text and buttons, shared by the whole-screen and the app-only shield.
+struct ShieldContent: View {
+    let model: ShieldModel
+
+    var body: some View {
         VStack(spacing: 14) {
             Text("Face Unlock Required\nto open \(model.appName)")
                 .font(.system(size: 26, weight: .regular))
