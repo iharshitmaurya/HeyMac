@@ -16,6 +16,9 @@ final class SetupFlow {
 
     let model: AppModel
     var step: Step
+    /// The step the window opened on; Back never goes before it (the Test window opens mid-flow).
+    let startStep: Step
+    private var advanceTask: Task<Void, Never>?
 
     var cameraAuthorized = false
     var cameraDenied = false
@@ -25,6 +28,8 @@ final class SetupFlow {
     var sampleTarget = 8
     var enrollHint = ""
     var enrollFinished = false
+    enum HintTone { case neutral, good, warn }
+    var enrollHintTone = HintTone.neutral
 
     var testing = false
     var testMessage: String?
@@ -41,6 +46,7 @@ final class SetupFlow {
     init(model: AppModel, startAt step: Step) {
         self.model = model
         self.step = step
+        self.startStep = step
         refreshCameraStatus()
         if step == .enroll || step == .test { startPreview() }
     }
@@ -99,7 +105,8 @@ final class SetupFlow {
         enrolling = true
         enrollFinished = false
         samplesCaptured = 0
-        enrollHint = "Look straight at the camera."
+        enrollHint = "Hold still and look straight at the camera."
+        enrollHintTone = .neutral
         startPreview()
         let enroller = runtime.enroller()
         sampleTarget = enroller.target
@@ -117,15 +124,25 @@ final class SetupFlow {
             samplesCaptured = count
             sampleTarget = target
             enrollHint = "Keep looking at the camera…"
+            enrollHintTone = .neutral
         case .rejectedNotLive:
             enrollHint = "Make sure it's your real face, well lit — photos and screens are rejected."
+            enrollHintTone = .warn
         case .finished(let minAgreement, _):
             enrollFinished = true
             enrollHint = String(format: "Saved. Sample agreement: %.2f", minAgreement)
+            enrollHintTone = .good
             model.log.write(String(format: "enrolled with minimum sample agreement %.3f", minAgreement))
-            advance()
+            // Hold the success state so the checkmark is seen; Back/close/Continue cancel it.
+            advanceTask?.cancel()
+            advanceTask = Task { [weak self] in
+                try? await Task.sleep(nanoseconds: 1_200_000_000)
+                guard !Task.isCancelled, let self, self.step == .enroll else { return }
+                self.advance()
+            }
         case .failed(let message):
             enrollHint = message
+            enrollHintTone = .warn
         }
     }
 
@@ -179,18 +196,30 @@ final class SetupFlow {
 
     // MARK: - Navigation
 
+    var canGoBack: Bool { step.rawValue > startStep.rawValue && !enrolling }
+
+    func back() {
+        guard canGoBack, let prev = Step(rawValue: step.rawValue - 1) else { return }
+        advanceTask?.cancel()
+        step = prev
+        if prev == .enroll || prev == .test { startPreview() } else { stopPreview() }
+    }
+
     func advance() {
+        advanceTask?.cancel()
         guard let next = Step(rawValue: step.rawValue + 1) else { return }
         step = next
         if next == .enroll || next == .test { startPreview() } else { stopPreview() }
     }
 
     func finish() {
+        advanceTask?.cancel()
         stopPreview()
         model.finishSetup()
     }
 
     func close() {
+        advanceTask?.cancel()
         stopPreview()
         model.windows.close(id: "setup")
     }

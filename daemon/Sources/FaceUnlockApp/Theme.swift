@@ -152,6 +152,15 @@ struct StatusChip: View {
             case .idle: return .secondary
             }
         }
+        /// Adaptive AA text variant of `color`.
+        var textColor: Color {
+            switch self {
+            case .good: return Theme.goodText
+            case .warn: return Theme.warnText
+            case .bad: return Theme.badText
+            case .idle: return .secondary
+            }
+        }
     }
     let text: String
     let tone: Tone

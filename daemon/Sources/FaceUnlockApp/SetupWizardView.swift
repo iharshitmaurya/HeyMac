@@ -4,87 +4,184 @@ import FaceUnlockEngine
 struct SetupWizardView: View {
     let flow: SetupFlow
 
+    private static let stepCount = SetupFlow.Step.allCases.count
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            Text(flow.title).font(.title2).bold()
-
-            switch flow.step {
-            case .welcome: welcome
-            case .camera: camera
-            case .enroll: enroll
-            case .test: test
-            case .features: features
-            case .done: done
+        VStack(spacing: 0) {
+            header
+            GeometryReader { geo in
+                ScrollView {
+                    VStack(alignment: .leading, spacing: Spacing.lg) { content }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, Spacing.xl)
+                        .padding(.vertical, Spacing.lg)
+                        .frame(maxWidth: .infinity, minHeight: geo.size.height, alignment: .top)
+                }
             }
-
-            Spacer()
+            Divider()
+            footer
         }
-        .padding(24)
-        .frame(width: 520, height: 560, alignment: .topLeading)
+        .frame(maxWidth: 520)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color(nsColor: .windowBackgroundColor))
     }
 
+    @ViewBuilder private var content: some View {
+        switch flow.step {
+        case .welcome: welcome
+        case .camera: camera
+        case .enroll: enroll
+        case .test: test
+        case .features: features
+        case .done: done
+        }
+    }
+
+    // MARK: - Frame
+
+    private var header: some View {
+        let index = flow.step.rawValue
+        return VStack(alignment: .leading, spacing: Spacing.sm) {
+            Text("Step \(index + 1) of \(Self.stepCount)")
+                .font(Typography.caption).foregroundStyle(.secondary)
+                .lineLimit(1)
+            HStack(spacing: Spacing.xs) {
+                ForEach(0..<Self.stepCount, id: \.self) { i in
+                    Capsule().fill(i <= index ? Theme.accent : Color.primary.opacity(0.14))
+                        .frame(height: 4)
+                }
+            }
+            .accessibilityHidden(true)
+            Text(flow.title).font(.title2).bold().lineLimit(1).minimumScaleFactor(0.8)
+                .padding(.top, Spacing.xs)
+        }
+        .padding(.horizontal, Spacing.xl)
+        .padding(.top, Spacing.lg)
+        .padding(.bottom, Spacing.sm)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Step \(index + 1) of \(Self.stepCount): \(flow.title)")
+    }
+
+    /// Pinned action bar: Back leading, secondary then primary trailing — the primary never moves.
+    private var footer: some View {
+        HStack(spacing: Spacing.sm) {
+            if flow.canGoBack {
+                Button("Back") { flow.back() }.buttonStyle(PillButtonStyle(kind: .secondary))
+            }
+            Spacer(minLength: Spacing.sm)
+            footerButtons
+        }
+        .padding(.horizontal, Spacing.xl)
+        .padding(.vertical, Spacing.lg)
+        .frame(minHeight: 64)
+    }
+
+    @ViewBuilder private var footerButtons: some View {
+        switch flow.step {
+        case .welcome:
+            primary("Get Started") { flow.advance() }
+        case .camera:
+            if flow.cameraAuthorized {
+                primary("Continue") { flow.advance() }
+            } else if flow.cameraDenied {
+                secondary("Check Again") { flow.refreshCameraStatus() }
+                primary("Open System Settings") { flow.model.openSystemSettings(anchor: "Privacy_Camera") }
+            } else {
+                primary("Allow Camera Access") { flow.requestCamera() }
+            }
+        case .enroll:
+            if flow.enrollFinished {
+                primary("Continue") { flow.advance() }
+            } else {
+                primary(flow.enrolling ? "Enrolling…" : "Start Enrolling") { flow.startEnrollment() }
+                    .disabled(flow.enrolling)
+            }
+        case .test:
+            if flow.model.setupComplete {
+                secondary("Close") { flow.close() }
+                primary(flow.testing ? "Checking…" : "Test Now") { flow.runTest() }.disabled(flow.testing)
+            } else if flow.testPassed {
+                secondary(flow.testing ? "Checking…" : "Test Again") { flow.runTest() }.disabled(flow.testing)
+                primary("Continue") { flow.advance() }
+            } else {
+                primary(flow.testing ? "Checking…" : "Test Now") { flow.runTest() }.disabled(flow.testing)
+            }
+        case .features:
+            primary("Continue") { flow.advance() }
+        case .done:
+            primary("Done") { flow.finish() }
+        }
+    }
+
+    private func primary(_ title: String, action: @escaping () -> Void) -> some View {
+        Button(title, action: action).buttonStyle(PillButtonStyle(kind: .primary)).keyboardShortcut(.defaultAction)
+    }
+
+    private func secondary(_ title: String, action: @escaping () -> Void) -> some View {
+        Button(title, action: action).buttonStyle(PillButtonStyle(kind: .secondary))
+    }
+
+    /// Status line: colored icon plus text in the adaptive text color, wrapping allowed.
+    private func banner(_ text: String, icon: String, tone: StatusChip.Tone) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: Spacing.sm) {
+            Image(systemName: icon).foregroundStyle(tone.color).accessibilityHidden(true)
+            Text(text).foregroundStyle(tone.textColor).fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private func point(_ text: String, icon: String) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: Spacing.md) {
+            Image(systemName: icon).foregroundStyle(Theme.accentText)
+                .frame(width: 22).accessibilityHidden(true)
+            Text(text).fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    // MARK: - Steps
+
     private var welcome: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: Spacing.lg) {
             Image(systemName: "faceid").font(.system(size: 52)).foregroundStyle(Theme.accent)
+                .accessibilityHidden(true)
             Text("Unlock sudo in Terminal and your lock screen by looking at the camera.")
-            Label("Your face stays on this Mac, stored encrypted as numbers — not photos.", systemImage: "lock.shield")
-            Label("Your password always keeps working. Face unlock is only a shortcut.", systemImage: "key")
-            Label("The camera runs only while a check is happening.", systemImage: "video")
-            Button("Get Started") { flow.advance() }
-                .buttonStyle(PillButtonStyle(kind: .primary))
-                .keyboardShortcut(.defaultAction)
-                .padding(.top, 6)
+            point("Your face stays on this Mac, stored encrypted as numbers — not photos.", icon: "lock.shield")
+            point("Your password always keeps working. Face unlock is only a shortcut.", icon: "key")
+            point("The camera runs only while a check is happening.", icon: "video")
         }
     }
 
     private var camera: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: Spacing.lg) {
             Text("FaceUnlock needs the camera to recognize you.")
             if flow.cameraAuthorized {
-                Label("Camera access granted.", systemImage: "checkmark.circle.fill").foregroundStyle(Theme.good)
-                Button("Continue") { flow.advance() }
-                    .buttonStyle(PillButtonStyle(kind: .primary))
-                    .keyboardShortcut(.defaultAction)
-                    .padding(.top, 6)
+                banner("Camera access granted.", icon: "checkmark.circle.fill", tone: .good)
             } else if flow.cameraDenied {
-                Label("Camera access was denied.", systemImage: "exclamationmark.triangle.fill").foregroundStyle(Theme.warn)
-                Text("Turn it on in System Settings, then come back to this window.")
-                HStack(spacing: 10) {
-                    Button("Open System Settings") { flow.model.openSystemSettings(anchor: "Privacy_Camera") }
-                        .buttonStyle(PillButtonStyle(kind: .primary))
-                    Button("Check Again") { flow.refreshCameraStatus() }
-                        .buttonStyle(PillButtonStyle(kind: .secondary))
-                }
-                .padding(.top, 6)
-            } else {
-                Button("Allow Camera Access") { flow.requestCamera() }
-                    .buttonStyle(PillButtonStyle(kind: .primary))
-                    .keyboardShortcut(.defaultAction)
-                    .padding(.top, 6)
+                banner("Camera access was denied.", icon: "exclamationmark.triangle.fill", tone: .warn)
+                CaptionText("Turn it on in System Settings, then come back to this window.")
             }
         }
     }
 
     private var enroll: some View {
-        VStack(spacing: 18) {
+        VStack(spacing: Spacing.lg) {
             Text("Look straight at the camera in good, even light.")
                 .frame(maxWidth: .infinity, alignment: .leading)
             enrollPreview
             sampleDots
-            Text(flow.enrollHint.isEmpty ? " " : flow.enrollHint)
-                .font(.system(size: 12.5)).foregroundStyle(.secondary)
-                .frame(minHeight: 16)
-            HStack(spacing: 10) {
-                Button(flow.enrolling ? "Enrolling…" : "Start Enrolling") { flow.startEnrollment() }
-                    .buttonStyle(PillButtonStyle(kind: .primary))
-                    .disabled(flow.enrolling)
-                    .keyboardShortcut(.defaultAction)
-                if flow.enrollFinished {
-                    Button("Continue") { flow.advance() }.buttonStyle(PillButtonStyle(kind: .secondary))
-                }
-            }
-            .padding(.top, 4)
-            .frame(maxWidth: .infinity, alignment: .leading)
+            Text(flow.enrollHint)
+                .font(.system(size: 13))
+                .foregroundStyle(hintColor)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: .infinity, minHeight: 40, alignment: .top)
+        }
+    }
+
+    private var hintColor: Color {
+        switch flow.enrollHintTone {
+        case .neutral: return .secondary
+        case .good: return Theme.goodText
+        case .warn: return Theme.warnText
         }
     }
 
@@ -105,7 +202,7 @@ struct SetupWizardView: View {
                     .frame(width: 220, height: 220)
                     .clipShape(Circle())
             } else if !flow.enrollFinished {
-                Text("Camera off").font(.system(size: 12)).foregroundStyle(.secondary)
+                cameraOffLabel(nil)
             }
 
             Circle()
@@ -131,6 +228,9 @@ struct SetupWizardView: View {
             }
         }
         .frame(width: 236, height: 236)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Enrollment progress")
+        .accessibilityValue("\(flow.samplesCaptured) of \(flow.sampleTarget) samples")
     }
 
     private var enrollProgress: Double {
@@ -152,35 +252,20 @@ struct SetupWizardView: View {
     }
 
     private var test: some View {
-        VStack(spacing: 18) {
-            Text("Let's check that FaceUnlock recognizes you.")
+        VStack(spacing: Spacing.lg) {
+            Text("Look at the camera, then press Test Now.")
                 .frame(maxWidth: .infinity, alignment: .leading)
             testPreview
-            HStack(spacing: 10) {
+            VStack(spacing: Spacing.sm) {
                 MatchFeedbackView(state: matchState)
-                Text(matchCaption).font(.system(size: 12.5)).foregroundStyle(.secondary)
+                Text(matchCaption)
+                    .font(.system(size: 13)).foregroundStyle(matchColor)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: .infinity, minHeight: 40, alignment: .top)
             }
-            .frame(maxWidth: .infinity, minHeight: 20, alignment: .leading)
-            HStack(spacing: 10) {
-                Button(flow.testing ? "Checking…" : "Test Now") { flow.runTest() }
-                    .buttonStyle(PillButtonStyle(kind: .primary))
-                    .disabled(flow.testing)
-                    .keyboardShortcut(.defaultAction)
-                if flow.model.setupComplete {
-                    Button("Close") { flow.close() }.buttonStyle(PillButtonStyle(kind: .secondary))
-                } else {
-                    Button("Continue") { flow.advance() }
-                        .buttonStyle(PillButtonStyle(kind: .secondary))
-                        .disabled(!flow.testPassed)
-                }
-            }
-            .padding(.top, 4)
-            .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 
-    /// Circular, centered — matches the enrollment preview's framing so the two screens
-    /// read as the same "camera moment," not two different UI styles.
     private var matchState: MatchState {
         if flow.testing { return .idle }
         if flow.testMessage != nil { return flow.testPassed ? .success : .fail }
@@ -189,7 +274,12 @@ struct SetupWizardView: View {
 
     private var matchCaption: String {
         if flow.testing { return "Scanning…" }
-        return flow.testMessage ?? " "
+        return flow.testMessage ?? ""
+    }
+
+    private var matchColor: Color {
+        if flow.testing || flow.testMessage == nil { return .secondary }
+        return flow.testPassed ? Theme.goodText : Theme.badText
     }
 
     private var testPreview: some View {
@@ -203,65 +293,78 @@ struct SetupWizardView: View {
                     .frame(width: 220, height: 220)
                     .clipShape(Circle())
             } else {
-                Text("Camera off").font(.system(size: 12)).foregroundStyle(.secondary)
+                cameraOffLabel("Press Test Now to start")
             }
             Circle().stroke(Color.primary.opacity(0.1), lineWidth: 6).frame(width: 236, height: 236)
         }
         .frame(width: 236, height: 236)
     }
 
+    /// Always on the black disc, so fixed light text — never `.secondary`, which is dark in light mode.
+    private func cameraOffLabel(_ detail: String?) -> some View {
+        VStack(spacing: Spacing.xs) {
+            Image(systemName: "video.slash").font(.system(size: 22)).accessibilityHidden(true)
+            Text("Camera off").font(.system(size: 13, weight: .semibold))
+            if let detail { Text(detail).font(Typography.caption) }
+        }
+        .foregroundStyle(Color.white.opacity(0.85))
+        .multilineTextAlignment(.center)
+        .padding(.horizontal, Spacing.xl)
+    }
+
     private var features: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: Spacing.lg) {
+            VStack(alignment: .leading, spacing: Spacing.sm) {
                 Toggle("Unlock sudo with my face", isOn: Binding(
                     get: { flow.model.sudoEnabled }, set: { flow.model.setSudoEnabled($0) }
-                )).tint(Theme.accent).disabled(flow.model.busy)
-                Text("Adds face unlock to sudo in Terminal. macOS asks for your admin password once to install it.")
-                    .font(.caption).foregroundStyle(.secondary)
+                )).toggleStyle(.switch).tint(Theme.accent).disabled(flow.model.busy)
+                CaptionText("Adds face unlock to sudo in Terminal. macOS asks for your admin password once to install it.")
             }
 
             Divider()
 
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: Spacing.sm) {
                 Text("Unlock the lock screen with my face").bold()
-                Text("FaceUnlock types your login password for you when it recognizes your face. It needs your password stored, encrypted, on this Mac.")
-                    .font(.caption).foregroundStyle(.secondary)
+                CaptionText("FaceUnlock types your login password for you when it recognizes your face. It needs your password stored, encrypted, on this Mac.")
                 SecureField("Login password", text: Binding(get: { flow.password }, set: { flow.password = $0 }))
                     .textFieldStyle(.roundedBorder)
                 SecureField("Confirm password", text: Binding(get: { flow.passwordConfirm }, set: { flow.passwordConfirm = $0 }))
                     .textFieldStyle(.roundedBorder)
-                Button("Save Password") { flow.saveLoginPassword() }.buttonStyle(PillButtonStyle(kind: .secondary))
-                if let message = flow.passwordMessage { Text(message).font(.caption).foregroundStyle(.secondary) }
+                secondary("Save Password") { flow.saveLoginPassword() }
+                    .disabled(flow.password.isEmpty || flow.passwordConfirm.isEmpty)
+                if let message = flow.passwordMessage {
+                    banner(message, icon: message == "Password saved." ? "checkmark.circle.fill" : "exclamationmark.circle.fill",
+                           tone: message == "Password saved." ? .good : .warn)
+                        .font(Typography.caption)
+                }
                 if flow.model.lockScreenEnabled {
                     if flow.model.accessibilityTrusted {
-                        Label("Accessibility permission granted.", systemImage: "checkmark.circle.fill").foregroundStyle(Theme.good)
+                        banner("Accessibility permission granted.", icon: "checkmark.circle.fill", tone: .good)
                     } else {
-                        Label("Needs Accessibility permission to type the password.", systemImage: "exclamationmark.triangle.fill")
-                            .foregroundStyle(Theme.warn)
-                        Button("Grant Accessibility Permission") { flow.model.requestAccessibility() }
-                            .buttonStyle(PillButtonStyle(kind: .secondary))
+                        banner("Needs Accessibility permission to type the password.", icon: "exclamationmark.triangle.fill", tone: .warn)
+                        secondary("Grant Accessibility Permission") { flow.model.requestAccessibility() }
                     }
                 }
             }
-
-            Button("Continue") { flow.advance() }
-                .buttonStyle(PillButtonStyle(kind: .primary))
-                .keyboardShortcut(.defaultAction)
         }
     }
 
     private var done: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            Label("FaceUnlock is ready.", systemImage: "checkmark.seal.fill").foregroundStyle(Theme.good)
+        VStack(alignment: .leading, spacing: Spacing.lg) {
+            banner("FaceUnlock is ready.", icon: "checkmark.seal.fill", tone: .good)
             Text("Look for the face icon in the menu bar. From there you can pause it, test it, or change settings.")
             if flow.model.sudoEnabled {
-                Text("Try it: open Terminal and run `sudo -k; sudo whoami` while looking at the camera.")
-                    .font(.callout).foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: Spacing.sm) {
+                    Text("Try it in Terminal while looking at the camera:")
+                        .font(.callout).foregroundStyle(.secondary)
+                    Text("sudo -k; sudo whoami")
+                        .font(Typography.mono)
+                        .textSelection(.enabled)
+                        .padding(.horizontal, Spacing.md).padding(.vertical, Spacing.sm)
+                        .background(Surface.card)
+                        .clipShape(RoundedRectangle(cornerRadius: Radius.sm, style: Radius.style))
+                }
             }
-            Button("Done") { flow.finish() }
-                .buttonStyle(PillButtonStyle(kind: .primary))
-                .keyboardShortcut(.defaultAction)
-                .padding(.top, 6)
         }
     }
 

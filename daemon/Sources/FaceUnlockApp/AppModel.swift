@@ -369,14 +369,14 @@ final class AppModel {
 
     func openSetup() {
         let flow = SetupFlow(model: self, startAt: .welcome)
-        windows.show(id: "setup", title: "Set Up FaceUnlock", size: CGSize(width: 520, height: 560)) {
+        windows.show(id: "setup", title: "Set Up FaceUnlock", size: CGSize(width: 520, height: 560), resizable: true, minSize: CGSize(width: 520, height: 560)) {
             SetupWizardView(flow: flow)
         }
     }
 
     func openTest() {
         let flow = SetupFlow(model: self, startAt: .test)
-        windows.show(id: "setup", title: "Test FaceUnlock", size: CGSize(width: 520, height: 560)) {
+        windows.show(id: "setup", title: "Test FaceUnlock", size: CGSize(width: 520, height: 560), resizable: true, minSize: CGSize(width: 520, height: 560)) {
             SetupWizardView(flow: flow)
         }
     }
@@ -388,7 +388,7 @@ final class AppModel {
         reloadSettings()
         stopEngine()
         let flow = SetupFlow(model: self, startAt: .enroll)
-        windows.show(id: "setup", title: "Re-enroll Your Face", size: CGSize(width: 520, height: 560)) {
+        windows.show(id: "setup", title: "Re-enroll Your Face", size: CGSize(width: 520, height: 560), resizable: true, minSize: CGSize(width: 520, height: 560)) {
             SetupWizardView(flow: flow)
         }
     }
