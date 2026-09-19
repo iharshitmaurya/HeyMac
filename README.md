@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cstyle%3E.b%7Bstroke:%230A84FF;animation:p 1.5s infinite alternate%7D.el%7Btransform-origin:35px 42px;animation:k 4s infinite%7D.er%7Btransform-origin:65px 42px;animation:k 4s infinite%7D.s%7Banimation:s 3s ease-in-out infinite%7D@keyframes p%7B0%25%7Bopacity:.4%7D100%25%7Bopacity:1%7D%7D@keyframes k%7B0%25,92%25,98%25,100%25%7Btransform:scaleY(1)%7D95%25%7Btransform:scaleY(.1)%7D%7D@keyframes s%7B0%25,100%25%7Btransform:translateY(20px);opacity:0%7D10%25,90%25%7Bopacity:1%7D50%25%7Btransform:translateY(80px)%7D%7D%3C/style%3E%3Crect width='100' height='100' rx='22' fill='%231C1C1E'/%3E%3Cpath class='b' d='M30 20h-5c-2.8 0-5 2.2-5 5v5m50-10h5c2.8 0 5 2.2 5 5v5M20 70v5c0 2.8 2.2 5 5 5h5m50-10v5c0 2.8-2.2 5-5 5h-5' fill='none' stroke-width='6' stroke-linecap='round'/%3E%3Ccircle class='el' cx='35' cy='42' r='5' fill='%23FFF'/%3E%3Ccircle class='er' cx='65' cy='42' r='5' fill='%23FFF'/%3E%3Cpath d='M50 50v8M40 68q10 10 20 0' fill='none' stroke='%23FFF' stroke-width='5' stroke-linecap='round'/%3E%3Cline class='s' x1='20' y1='0' x2='80' y2='0' stroke='%230A84FF' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E" width="90" alt="Animated Hey Mac Logo" style="margin-bottom: 20px; box-shadow: 0 10px 20px rgba(0,0,0,0.15); border-radius: 22px;"/>
+<img src="assets/logo.svg" width="90" alt="Animated Hey Mac Logo" style="margin-bottom: 20px; box-shadow: 0 10px 20px rgba(0,0,0,0.15); border-radius: 22px;"/>
 
 # Hey Mac
 
