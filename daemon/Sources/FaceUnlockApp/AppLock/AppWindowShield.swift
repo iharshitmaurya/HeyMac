@@ -95,6 +95,10 @@ final class AppWindowShield {
             ctx.duration = 0
             for panel in pool.values { panel.animator().alphaValue = 1 }
         }
+        // Animator cancellation semantics are unverified, so also restore the alpha directly and
+        // again in the stale-fade completion below: privacy over polish (costs a brief flicker
+        // when a present lands during a fade).
+        for panel in pool.values { panel.alphaValue = 1 }
         timer?.invalidate()
         tick()
         let t = Timer(timeInterval: Self.pollInterval, repeats: true) { [weak self] timer in
@@ -117,7 +121,13 @@ final class AppWindowShield {
             for panel in fading { panel.animator().alphaValue = 0 }
         }, completionHandler: { [weak self] in
             MainActor.assumeIsolated {
-                guard let self, self.generation == mine else { return }
+                guard let self else { return }
+                guard self.generation == mine else {
+                    // Stale: a newer present landed mid-fade and this fade may have finished
+                    // after it, leaving the panels invisible. Restore them if showing.
+                    if self.isShowing { for panel in fading { panel.alphaValue = 1 } }
+                    return
+                }
                 for panel in fading { panel.orderOut(nil); panel.alphaValue = 1 }
                 self.pool.removeAll()
                 self.contentWindow = nil

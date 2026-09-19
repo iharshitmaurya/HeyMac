@@ -70,6 +70,10 @@ final class ShieldController {
             ctx.duration = 0
             for panel in panels.values { panel.animator().alphaValue = 1 }
         }
+        // Animator cancellation semantics are unverified, so also restore the alpha directly and
+        // again in the stale-fade completion below: privacy over polish (costs a brief flicker
+        // when a present lands during a fade).
+        for panel in panels.values { panel.alphaValue = 1 }
         if activeMode == .fullScreen, windowShield?.isShowing == true { windowShield?.dismiss() }
         if activeMode == .appWindowsOnly {
             let shield = windowShield ?? AppWindowShield(model: model)
@@ -108,7 +112,13 @@ final class ShieldController {
             for panel in fading { panel.animator().alphaValue = 0 }
         }, completionHandler: { [weak self] in
             MainActor.assumeIsolated {
-                guard self?.generation == mine else { return }
+                guard let self else { return }
+                guard self.generation == mine else {
+                    // Stale: a newer present landed mid-fade and this fade may have finished
+                    // after it, leaving the panels invisible. Restore them if a shield is up.
+                    if self.isShowing { for panel in fading { panel.alphaValue = 1 } }
+                    return
+                }
                 for panel in fading { panel.orderOut(nil); panel.alphaValue = 1 }
             }
         })
