@@ -5,7 +5,7 @@
 	<key>Label</key>
 	<string>com.faceunlock.app.agent</string>
 	<key>BundleProgram</key>
-	<string>Contents/MacOS/FaceUnlock</string>
+	<string>Contents/MacOS/HeyMac</string>
 	<key>RunAtLoad</key>
 	<true/>
 	<key>KeepAlive</key>

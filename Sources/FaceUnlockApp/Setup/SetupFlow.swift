@@ -56,7 +56,7 @@ final class SetupFlow {
 
     var title: String {
         switch step {
-        case .welcome: return "Welcome to FaceUnlock"
+        case .welcome: return "Welcome to Hey Mac"
         case .camera: return "Camera access"
         case .enroll: return "Enroll your face"
         case .test: return "Check that it recognizes you"

@@ -6,7 +6,7 @@ private final class ScriptRecorder: @unchecked Sendable {
     var scripts: [String] = []
 }
 
-private let script = URL(fileURLWithPath: "/Applications/FaceUnlock.app/Contents/Resources/uninstall-sudo-hook.sh")
+private let script = URL(fileURLWithPath: "/Applications/HeyMac.app/Contents/Resources/uninstall-sudo-hook.sh")
 
 private func makeCleanup(existing: Set<String> = [], sudoLocal: String? = nil, recorder: ScriptRecorder = ScriptRecorder()) -> LegacySudoCleanup {
     LegacySudoCleanup(

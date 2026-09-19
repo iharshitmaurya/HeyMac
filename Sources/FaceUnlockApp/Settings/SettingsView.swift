@@ -153,7 +153,7 @@ private struct StatusPane: View {
 
         PaneSection {
             SettingsCard {
-                switchRow("Start FaceUnlock at login",
+                switchRow("Start Hey Mac at login",
                           isOn: Binding(get: { model.launchAtLogin }, set: { model.setLaunchAtLogin($0) }))
                 RowDivider()
                 switchRow("Pause face unlock", caption: "Falls back to your password immediately",
@@ -297,7 +297,7 @@ private struct AboutPane: View {
                 .frame(width: 52, height: 52)
                 .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: Spacing.xs) {
-                    Text("FaceUnlock").font(.system(size: 16, weight: .bold)).lineLimit(1)
+                    Text("Hey Mac").font(.system(size: 16, weight: .bold)).lineLimit(1)
                     Text("Version \(version)").font(Typography.mono).foregroundStyle(.secondary).lineLimit(1)
                 }
                 Spacer(minLength: 0)

@@ -1,4 +1,4 @@
-# FaceUnlock
+# Hey Mac
 
 A macOS menu-bar app that unlocks your Mac's lock screen with your face and can lock chosen apps behind Face ID, Touch ID or your password. A notch "island" overlay shows scan progress.
 
@@ -25,9 +25,9 @@ tools/                throwaway spikes
 ## Build
 
 ```sh
-swift build --product FaceUnlock      # dev build
+swift build --product HeyMac      # dev build
 scripts/create-signing-identity.sh    # once: stable signing so permissions survive rebuilds
-scripts/build-app.sh 1.0.0            # dist/FaceUnlock.app and a DMG
+scripts/build-app.sh 1.0.0            # dist/HeyMac.app and a DMG
 ```
 
-`swift run FaceUnlock --render-ui <dir>` renders the app's screens to PNG.
+`swift run HeyMac --render-ui <dir>` renders the app's screens to PNG.

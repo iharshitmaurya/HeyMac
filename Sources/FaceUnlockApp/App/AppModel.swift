@@ -353,14 +353,14 @@ final class AppModel {
 
     func openSetup() {
         let flow = SetupFlow(model: self, startAt: .welcome)
-        windows.show(id: "setup", title: "Set Up FaceUnlock", size: CGSize(width: 720, height: 540), resizable: true, minSize: CGSize(width: 640, height: 500)) {
+        windows.show(id: "setup", title: "Set Up Hey Mac", size: CGSize(width: 720, height: 540), resizable: true, minSize: CGSize(width: 640, height: 500)) {
             SetupWizardView(flow: flow)
         }
     }
 
     func openTest() {
         let flow = SetupFlow(model: self, startAt: .test)
-        windows.show(id: "setup", title: "Test FaceUnlock", size: CGSize(width: 720, height: 540), resizable: true, minSize: CGSize(width: 640, height: 500)) {
+        windows.show(id: "setup", title: "Test Hey Mac", size: CGSize(width: 720, height: 540), resizable: true, minSize: CGSize(width: 640, height: 500)) {
             SetupWizardView(flow: flow)
         }
     }
@@ -378,7 +378,7 @@ final class AppModel {
     }
 
     func openSettings() {
-        windows.show(id: "settings", title: "FaceUnlock Settings", size: CGSize(width: 720, height: 560),
+        windows.show(id: "settings", title: "Hey Mac Settings", size: CGSize(width: 720, height: 560),
                      resizable: true, minSize: CGSize(width: 640, height: 480), autosaveName: "FaceUnlockSettings") {
             SettingsView(model: self)
         }

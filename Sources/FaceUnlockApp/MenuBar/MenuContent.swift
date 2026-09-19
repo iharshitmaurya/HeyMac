@@ -43,11 +43,11 @@ struct MenuContent: View {
                 .disabled(!model.setupComplete)
             divider
             if !model.setupComplete {
-                actionRow("Set Up FaceUnlock…", icon: "person.crop.circle.badge.plus", shortcut: nil) { model.openSetup() }
+                actionRow("Set Up Hey Mac…", icon: "person.crop.circle.badge.plus", shortcut: nil) { model.openSetup() }
             }
             actionRow("Settings…", icon: "gearshape", shortcut: "⌘,") { model.openSettings() }
             divider
-            actionRow("Quit FaceUnlock", icon: "rectangle.portrait.and.arrow.right", shortcut: "⌘Q", iconTint: Theme.badText) { NSApplication.shared.terminate(nil) }
+            actionRow("Quit Hey Mac", icon: "rectangle.portrait.and.arrow.right", shortcut: "⌘Q", iconTint: Theme.badText) { NSApplication.shared.terminate(nil) }
         }
         .padding(.bottom, Spacing.sm)
         .frame(width: 302)
@@ -110,8 +110,8 @@ struct MenuContent: View {
 
     private var statusTitle: String {
         if !model.setupComplete { return "Not Set Up Yet" }
-        if paused { return "Face Unlock Is Paused" }
-        return "Face Unlock Is On"
+        if paused { return "Hey Mac Is Paused" }
+        return "Hey Mac Is On"
     }
 
     private func iconView(_ name: String, tint: Color? = nil) -> some View {

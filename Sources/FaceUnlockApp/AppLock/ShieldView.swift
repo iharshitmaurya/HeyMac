@@ -85,7 +85,7 @@ struct ShieldContent: View {
 
     var body: some View {
         VStack(spacing: Spacing.md + Spacing.xs / 2) {
-            Text("Face Unlock Required\nto open \(model.appName)")
+            Text("Hey Mac Required\nto open \(model.appName)")
                 .font(.system(size: 26, weight: .regular))
                 .lineSpacing(Spacing.sm)
                 .multilineTextAlignment(.center)
@@ -122,6 +122,6 @@ struct ShieldContent: View {
         .shadow(color: .black.opacity(0.35), radius: 6)
         .environment(\.colorScheme, .dark)
         .accessibilityElement(children: .contain)
-        .accessibilityLabel("Face Unlock required to open \(model.appName). \(status)")
+        .accessibilityLabel("Hey Mac required to open \(model.appName). \(status)")
     }
 }

@@ -1,5 +1,5 @@
 #!/bin/bash
-# One-time setup on the Mac that builds FaceUnlock releases: creates a self-signed
+# One-time setup on the Mac that builds Hey Mac releases: creates a self-signed
 # code-signing certificate in the login keychain and trusts it for code signing.
 # macOS asks for your password once to approve the trust change.
 set -euo pipefail

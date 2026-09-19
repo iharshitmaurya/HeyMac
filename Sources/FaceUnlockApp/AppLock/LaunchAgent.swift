@@ -1,7 +1,7 @@
 import FaceUnlockEngine
 import ServiceManagement
 
-/// A per-user launch agent with KeepAlive, so a crash or `kill` restarts FaceUnlock (and
+/// A per-user launch agent with KeepAlive, so a crash or `kill` restarts Hey Mac (and
 /// every locked app relocks, since sessions live in memory). An authorized quit exits with
 /// status 0, which the plist's `SuccessfulExit = false` treats as "don't restart".
 enum AppLockAgent {

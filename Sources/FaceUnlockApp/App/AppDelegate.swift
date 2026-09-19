@@ -1,6 +1,6 @@
 import AppKit
 
-/// Quit guard: while App Lock protects anything, quitting FaceUnlock (menu, ⌘Q, or a
+/// Quit guard: while App Lock protects anything, quitting Hey Mac (menu, ⌘Q, or a
 /// programmatic terminate) must first pass the same face → Touch ID → password chain.
 /// Logout and shutdown go through the same prompt (`quitAuthorized` is set only after a successful authorize).
 final class AppDelegate: NSObject, NSApplicationDelegate {
@@ -17,7 +17,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guard !quitPromptActive else { return .terminateCancel } // one auth chain at a time
         quitPromptActive = true
         Task { @MainActor in
-            let allowed = await controller.authorize(reason: "Quit FaceUnlock")
+            let allowed = await controller.authorize(reason: "Quit Hey Mac")
             quitPromptActive = false
             if allowed { controller.quitAuthorized = true }
             sender.reply(toApplicationShouldTerminate: allowed)

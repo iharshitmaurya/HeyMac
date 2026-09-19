@@ -274,7 +274,7 @@ struct SetupWizardView: View {
                 .background(WZ.logoTile, in: RoundedRectangle(cornerRadius: 19, style: .continuous))
                 .overlay(RoundedRectangle(cornerRadius: 19, style: .continuous).stroke(Color.primary.opacity(0.1), lineWidth: 1))
                 .accessibilityHidden(true)
-            h1("Welcome to FaceUnlock", size: 28).padding(.top, 8)
+            h1("Welcome to Hey Mac", size: 28).padding(.top, 8)
             bodyText("Unlock your lock screen and the apps you choose, just by looking at your Mac.")
             HStack(alignment: .top, spacing: 16) {
                 feature("checkmark.shield", "Stays on your Mac", "Nothing is uploaded.")
@@ -290,16 +290,16 @@ struct SetupWizardView: View {
             if flow.cameraAuthorized {
                 circleIcon("checkmark", tint: WZ.good, bg: WZ.goodBg)
                 h1("Camera access allowed")
-                bodyText("Face Unlock can see you when you unlock. Photos are never saved, and nothing leaves your Mac.")
+                bodyText("Hey Mac can see you when you unlock. Photos are never saved, and nothing leaves your Mac.")
             } else if flow.cameraDenied {
                 circleIcon("exclamationmark.triangle", tint: WZ.warn, bg: WZ.warnBg)
                 h1("Camera access is off")
-                bodyText("Face Unlock can’t see you without it. Turn it on in System Settings, under Privacy & Security, then Camera.")
+                bodyText("Hey Mac can’t see you without it. Turn it on in System Settings, under Privacy & Security, then Camera.")
                 chip("Permission denied", icon: "exclamationmark.triangle.fill", fg: WZ.warn, bg: WZ.warnBg)
             } else {
                 circleIcon("camera", tint: WZ.accentText, bg: WZ.accentTint)
                 h1("Allow camera access")
-                bodyText("Face Unlock uses the camera only to see your face when you unlock. Photos are never saved, and nothing leaves your Mac.")
+                bodyText("Hey Mac uses the camera only to see your face when you unlock. Photos are never saved, and nothing leaves your Mac.")
             }
         }
     }
@@ -396,7 +396,7 @@ struct SetupWizardView: View {
         if flow.testing { return "Look at the camera." }
         if flow.testMessage == nil { return "Look at the camera, then press Test Now." }
         return flow.testPassed
-            ? "Face Unlock is working."
+            ? "Hey Mac is working."
             : "Try facing the camera in better light. If it keeps happening, enroll again."
     }
 
@@ -483,7 +483,7 @@ struct SetupWizardView: View {
             tile("keyboard")
             VStack(alignment: .leading, spacing: 2) {
                 Text("Accessibility").font(.system(size: 13, weight: .medium)).lineLimit(1)
-                Text("Lets Face Unlock press keys on the lock screen.")
+                Text("Lets Hey Mac press keys on the lock screen.")
                     .font(.system(size: 11)).foregroundStyle(WZ.text2)
                     .fixedSize(horizontal: false, vertical: true)
             }

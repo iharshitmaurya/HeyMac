@@ -1,6 +1,6 @@
 #!/bin/bash
-# Removes the sudo face-unlock hook that older FaceUnlock versions installed.
-# FaceUnlock runs this once (with an administrator prompt) if it finds the leftovers.
+# Removes the sudo face-unlock hook that older versions installed.
+# Hey Mac runs this once (with an administrator prompt) if it finds the leftovers.
 set -euo pipefail
 
 MODULE_PATH="/usr/local/lib/pam/pam_faceunlock.so"

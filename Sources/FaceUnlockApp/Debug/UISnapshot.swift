@@ -1,7 +1,7 @@
 import AppKit
 import SwiftUI
 
-/// Hidden QA mode (`FaceUnlock --render-ui <dir>`): renders the real screens to PNG in light and dark,
+/// Hidden QA mode (`HeyMac --render-ui <dir>`): renders the real screens to PNG in light and dark,
 /// hosted in an off-screen NSWindow, using sample state from `AppModel.uiSnapshotMode`.
 /// Technique: NSHostingView in an NSWindow at x = -20000, ordered front, `cacheDisplay` into a
 /// bitmap, with the window background colour painted behind the content. NSViewRepresentable content (the shield

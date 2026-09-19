@@ -1,5 +1,5 @@
 #!/bin/bash
-# Builds FaceUnlock.app and a DMG in dist.
+# Builds HeyMac.app and a DMG in dist.
 # Usage: scripts/build-app.sh [version]
 set -euo pipefail
 
@@ -8,17 +8,17 @@ PACKAGING="$(dirname "$SCRIPT_DIR")/packaging"
 REPO_ROOT="$(dirname "$SCRIPT_DIR")"
 VERSION="${1:-1.0.0}"
 DIST="$REPO_ROOT/dist"
-APP="$DIST/FaceUnlock.app"
+APP="$DIST/HeyMac.app"
 source "$SCRIPT_DIR/lib-signing.sh"
 
 echo "Building executables (release)..."
-(cd "$REPO_ROOT" && swift build -c release --product FaceUnlock)
+(cd "$REPO_ROOT" && swift build -c release --product HeyMac)
 BIN="$(cd "$REPO_ROOT" && swift build -c release --show-bin-path)"
 
 echo "Assembling $APP..."
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
-cp "$BIN/FaceUnlock" "$APP/Contents/MacOS/FaceUnlock"
+cp "$BIN/HeyMac" "$APP/Contents/MacOS/HeyMac"
 # SwiftPM's resource bundle holds the Core ML models; the app looks for it here.
 cp -R "$BIN/FaceUnlockDaemon_FaceUnlockCore.bundle" "$APP/Contents/Resources/"
 cp -R "$REPO_ROOT/Sources/FaceUnlockApp/Animations" "$APP/Contents/Resources/Animations"
@@ -52,9 +52,9 @@ mkdir -p "$STAGING"
 cp -R "$APP" "$STAGING/"
 ln -s /Applications "$STAGING/Applications"
 cp "$PACKAGING/README.txt" "$STAGING/README.txt"
-DMG="$DIST/FaceUnlock-$VERSION.dmg"
+DMG="$DIST/HeyMac-$VERSION.dmg"
 rm -f "$DMG"
-hdiutil create -volname "FaceUnlock" -srcfolder "$STAGING" -ov -format UDZO "$DMG" >/dev/null
+hdiutil create -volname "Hey Mac" -srcfolder "$STAGING" -ov -format UDZO "$DMG" >/dev/null
 rm -rf "$STAGING"
 
 "$SCRIPT_DIR/verify-app.sh" "$APP"

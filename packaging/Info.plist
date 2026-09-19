@@ -5,11 +5,11 @@
 	<key>CFBundleIdentifier</key>
 	<string>com.faceunlock.app</string>
 	<key>CFBundleName</key>
-	<string>FaceUnlock</string>
+	<string>Hey Mac</string>
 	<key>CFBundleDisplayName</key>
-	<string>FaceUnlock</string>
+	<string>Hey Mac</string>
 	<key>CFBundleExecutable</key>
-	<string>FaceUnlock</string>
+	<string>HeyMac</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
@@ -23,7 +23,7 @@
 	<key>LSUIElement</key>
 	<true/>
 	<key>NSCameraUsageDescription</key>
-	<string>FaceUnlock uses the camera to recognize your face for lock-screen unlock and App Lock. Images never leave this Mac.</string>
+	<string>Hey Mac uses the camera to recognize your face for lock-screen unlock and App Lock. Images never leave this Mac.</string>
 	<key>NSHumanReadableCopyright</key>
 	<string>Face unlock for Apple Silicon Macs. Models: ArcFace (MIT) and MiniFASNetV2 (Apache-2.0).</string>
 </dict>

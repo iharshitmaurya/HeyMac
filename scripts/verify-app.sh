@@ -1,14 +1,14 @@
 #!/bin/bash
-# Checks a built FaceUnlock.app: contents, signature, and that the models really load.
+# Checks a built HeyMac.app: contents, signature, and that the models really load.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-APP="${1:-$(dirname "$SCRIPT_DIR")/dist/FaceUnlock.app}"
+APP="${1:-$(dirname "$SCRIPT_DIR")/dist/HeyMac.app}"
 fail() { echo "FAIL: $*" >&2; exit 1; }
 
 [ -d "$APP" ] || fail "no app at $APP"
 for path in \
-    Contents/MacOS/FaceUnlock \
+    Contents/MacOS/HeyMac \
     Contents/Info.plist \
     Contents/Resources/FaceUnlockDaemon_FaceUnlockCore.bundle \
     Contents/Resources/Animations/unlockstatic.png \
@@ -26,6 +26,6 @@ codesign --verify --deep --strict "$APP" || fail "signature does not verify"
 
 bash -n "$APP/Contents/Resources/uninstall-sudo-hook.sh" || fail "uninstall-sudo-hook.sh is not valid shell"
 
-"$APP/Contents/MacOS/FaceUnlock" --self-check || fail "self-check failed"
+"$APP/Contents/MacOS/HeyMac" --self-check || fail "self-check failed"
 
 echo "OK: $APP"

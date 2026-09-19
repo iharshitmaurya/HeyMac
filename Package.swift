@@ -5,7 +5,7 @@ let package = Package(
     name: "FaceUnlockDaemon",
     platforms: [.macOS(.v14)],
     products: [
-        .executable(name: "FaceUnlock", targets: ["FaceUnlockApp"]),
+        .executable(name: "HeyMac", targets: ["FaceUnlockApp"]),
     ],
     targets: [
         .target(

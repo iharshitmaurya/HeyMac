@@ -18,7 +18,7 @@ struct FaceUnlockApp: App {
             // QA harness: render the real screens to PNG with sample state, then exit. Runs before
             // the single-instance guard and before anything touches AppModel.shared.
             guard CommandLine.arguments.count > flag + 1 else {
-                FileHandle.standardError.write(Data("usage: FaceUnlock --render-ui <outputDir>\n".utf8))
+                FileHandle.standardError.write(Data("usage: HeyMac --render-ui <outputDir>\n".utf8))
                 exit(2)
             }
             let dir = CommandLine.arguments[flag + 1]
