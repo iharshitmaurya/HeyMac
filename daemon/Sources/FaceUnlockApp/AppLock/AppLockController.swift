@@ -207,6 +207,10 @@ final class AppLockController {
         }
         systemTokens.append(center.addObserver(forName: NSWorkspace.willPowerOffNotification, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.quitAuthorized = true } // never hang a shutdown on a prompt
+            // A cancelled or vetoed logout must not leave quit protection off; a completed one kills us first.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 60) {
+                MainActor.assumeIsolated { self?.quitAuthorized = false }
+            }
         })
         distributedTokens.append(DistributedNotificationCenter.default().addObserver(
             forName: Notification.Name("com.apple.screenIsLocked"), object: nil, queue: .main

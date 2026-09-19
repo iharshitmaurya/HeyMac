@@ -1,3 +1,4 @@
+import FaceUnlockEngine
 import ServiceManagement
 
 /// A per-user launch agent with KeepAlive, so a crash or `kill` restarts FaceUnlock (and
@@ -8,11 +9,11 @@ enum AppLockAgent {
 
     static func register() {
         guard service.status != .enabled else { return }
-        try? service.register()
+        do { try service.register() } catch { AppLog.shared.write("App Lock agent register failed: \(error)") }
     }
 
     static func unregister() {
-        guard service.status == .enabled else { return }
-        try? service.unregister()
+        guard service.status == .enabled || service.status == .requiresApproval else { return }
+        do { try service.unregister() } catch { AppLog.shared.write("App Lock agent unregister failed: \(error)") }
     }
 }

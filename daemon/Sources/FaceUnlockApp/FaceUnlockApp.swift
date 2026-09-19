@@ -14,11 +14,15 @@ struct FaceUnlockApp: App {
             print(problems.isEmpty ? "self-check passed" : "self-check failed (\(problems.count) problems)")
             exit(problems.isEmpty ? 0 : 1)
         }
-        // The launch agent and the login item can both start us; only one copy may run.
+        // The launch agent and the login item can both start us; only one copy may run, and the
+        // lowest pid keeps running so two simultaneous starts can never both yield. A duplicate
+        // exits NON-zero: launchd only restarts a KeepAlive/SuccessfulExit=false job on failure, so
+        // the agent job keeps retrying (every ~10 s) and, if the real instance is later killed,
+        // the next retry becomes the running instance and relocks everything.
         let me = ProcessInfo.processInfo.processIdentifier
         if let id = Bundle.main.bundleIdentifier,
-           NSRunningApplication.runningApplications(withBundleIdentifier: id).contains(where: { $0.processIdentifier != me }) {
-            exit(0)
+           NSRunningApplication.runningApplications(withBundleIdentifier: id).contains(where: { $0.processIdentifier < me }) {
+            exit(1)
         }
         model = AppModel.shared
     }

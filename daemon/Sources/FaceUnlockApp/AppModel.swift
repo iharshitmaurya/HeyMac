@@ -269,7 +269,6 @@ final class AppModel {
             guard await controller.authorize(reason: "Turn off App Lock") else { reloadSettings(); return }
             controller.store.enabled = false
             controller.stop()
-            AppLockAgent.unregister()
             reloadSettings()
         }
     }
