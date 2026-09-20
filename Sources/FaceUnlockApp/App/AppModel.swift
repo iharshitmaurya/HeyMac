@@ -203,7 +203,8 @@ final class AppModel {
 
     func setLockScreenEnabled(_ enabled: Bool) {
         if enabled, !(runtime?.hasLoginPassword ?? false) {
-            actionError = "Save your login password in Settings before turning this on"
+            actionError = "Add your login password in Settings › Lock Screen before turning this on."
+            SettingsSelection.shared.pane = .lockScreen
             openSettings()
             return
         }

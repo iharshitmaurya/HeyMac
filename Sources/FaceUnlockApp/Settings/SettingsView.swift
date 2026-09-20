@@ -3,7 +3,7 @@ import Observation
 import SwiftUI
 import FaceUnlockEngine
 
-private enum SettingsPane: String, CaseIterable, Identifiable {
+enum SettingsPane: String, CaseIterable, Identifiable {
     case status = "Status"
     case lockScreen = "Lock Screen"
     case appLock = "App Lock"
@@ -28,7 +28,8 @@ private enum SettingsPane: String, CaseIterable, Identifiable {
 /// Tools only, no full Xcode) doesn't have.
 @MainActor
 @Observable
-private final class SettingsSelection {
+final class SettingsSelection {
+    static let shared = SettingsSelection()
     var pane: SettingsPane = .status
 }
 
@@ -36,7 +37,7 @@ private final class SettingsSelection {
 /// Settings, Mail, and Notes.
 struct SettingsView: View {
     let model: AppModel
-    private let selection = SettingsSelection()
+    private let selection = SettingsSelection.shared
 
     /// `initialPaneIndex` (index into the sidebar order) is a snapshot-only hook; the app uses the default.
     init(model: AppModel, initialPaneIndex: Int = 0) {
@@ -176,8 +177,25 @@ private struct StatusPane: View {
 
 // MARK: - Lock Screen
 
+/// Form state as an `@Observable` class (no `@State` on this toolchain).
+@MainActor @Observable
+private final class PasswordForm {
+    var password = ""
+    var confirm = ""
+    var message: String?
+    var messageIsError = false
+    /// Bumped after a save so the pane re-reads whether a password exists.
+    var saveCount = 0
+}
+
 private struct LockScreenPane: View {
     let model: AppModel
+    private let form = PasswordForm()
+
+    private var hasPassword: Bool {
+        _ = form.saveCount
+        return model.runtime?.hasLoginPassword ?? false
+    }
 
     var body: some View {
         PaneTitle("Lock Screen")
@@ -185,6 +203,21 @@ private struct LockScreenPane: View {
         SettingsCard {
             switchRow("Unlock the lock screen with my face", chip: lockChip,
                       isOn: Binding(get: { model.lockScreenEnabled }, set: { model.setLockScreenEnabled($0) }))
+            if !hasPassword, let reason = model.actionError {
+                RowDivider()
+                HStack(alignment: .firstTextBaseline, spacing: Spacing.sm) {
+                    Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(Theme.warn)
+                    Text(reason).foregroundStyle(Theme.warnText).fixedSize(horizontal: false, vertical: true)
+                    Spacer(minLength: 0)
+                }
+                .font(Typography.caption)
+                .padding(.horizontal, Surface.rowInset).padding(.vertical, Spacing.md)
+            }
+        }
+
+        PaneSection(header: "Login password",
+                    footnote: "Hey Mac types this at the lock screen after your face matches. It is stored encrypted in your Keychain and never leaves this Mac.") {
+            SettingsCard { passwordForm }
         }
 
         PaneSection(header: "Matching strictness",
@@ -214,8 +247,54 @@ private struct LockScreenPane: View {
         }
     }
 
+    private var passwordForm: some View {
+        VStack(alignment: .leading, spacing: Spacing.md) {
+            HStack {
+                Text(hasPassword ? "Password saved" : "No password saved yet").font(Typography.rowTitle)
+                Spacer(minLength: Spacing.sm)
+                StatusChip(text: hasPassword ? "Saved" : "Not saved", tone: hasPassword ? .good : .warn)
+            }
+            SecureField(hasPassword ? "New login password" : "Login password",
+                        text: Binding(get: { form.password }, set: { form.password = $0 }))
+                .textFieldStyle(.roundedBorder)
+            SecureField("Confirm password", text: Binding(get: { form.confirm }, set: { form.confirm = $0 }))
+                .textFieldStyle(.roundedBorder)
+            HStack(spacing: Spacing.md) {
+                Button(hasPassword ? "Update Password" : "Save Password") { save() }
+                    .buttonStyle(PillButtonStyle(kind: .primary))
+                    .disabled(form.password.isEmpty)
+                if let message = form.message {
+                    Text(message).font(Typography.caption)
+                        .foregroundStyle(form.messageIsError ? Theme.badText : Theme.goodText)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 0)
+            }
+        }
+        .padding(Spacing.lg)
+    }
+
+    private func save() {
+        guard form.password == form.confirm else {
+            form.message = "The two passwords don't match."; form.messageIsError = true
+            return
+        }
+        if let error = model.saveLoginPassword(form.password) {
+            form.message = error; form.messageIsError = true
+            return
+        }
+        let wasBlocked = model.actionError != nil
+        form.password = ""; form.confirm = ""
+        form.message = "Password saved."; form.messageIsError = false
+        form.saveCount += 1
+        model.actionError = nil
+        // They tried to turn the lock screen on and were stopped: finish what they asked for.
+        if wasBlocked { model.setLockScreenEnabled(true) }
+    }
+
     private var lockChip: StatusChip {
-        model.accessibilityTrusted
+        if !hasPassword { return StatusChip(text: "Needs login password", tone: .warn) }
+        return model.accessibilityTrusted
             ? StatusChip(text: "Ready", tone: .good)
             : StatusChip(text: "Needs Accessibility permission", tone: .warn)
     }
