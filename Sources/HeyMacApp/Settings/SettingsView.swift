@@ -184,6 +184,8 @@ private final class PasswordForm {
     var confirm = ""
     var message: String?
     var messageIsError = false
+    /// A saved password shows a compact row; the fields appear only while changing it.
+    var isChanging = false
     /// Bumped after a save so the pane re-reads whether a password exists.
     var saveCount = 0
 }
@@ -249,29 +251,46 @@ private struct LockScreenPane: View {
 
     private var passwordForm: some View {
         VStack(alignment: .leading, spacing: Spacing.md) {
-            HStack {
-                Text(hasPassword ? "Password saved" : "No password saved yet").font(Typography.rowTitle)
+            HStack(spacing: Spacing.md) {
+                VStack(alignment: .leading, spacing: Spacing.xxs) {
+                    Text(hasPassword ? "Password saved" : "No password saved yet").font(Typography.rowTitle)
+                    if hasPassword, !form.isChanging, let message = form.message {
+                        Text(message).font(Typography.caption).foregroundStyle(Theme.goodText)
+                    }
+                }
                 Spacer(minLength: Spacing.sm)
                 StatusChip(text: hasPassword ? "Saved" : "Not saved", tone: hasPassword ? .good : .warn)
-            }
-            SecureField(hasPassword ? "New login password" : "Login password",
-                        text: Binding(get: { form.password }, set: { form.password = $0 }))
-                .textFieldStyle(.roundedBorder)
-            SecureField("Confirm password", text: Binding(get: { form.confirm }, set: { form.confirm = $0 }))
-                .textFieldStyle(.roundedBorder)
-            HStack(spacing: Spacing.md) {
-                Button(hasPassword ? "Update Password" : "Save Password") { save() }
-                    .buttonStyle(PillButtonStyle(kind: .primary))
-                    .disabled(form.password.isEmpty)
-                if let message = form.message {
-                    Text(message).font(Typography.caption)
-                        .foregroundStyle(form.messageIsError ? Theme.badText : Theme.goodText)
-                        .fixedSize(horizontal: false, vertical: true)
+                if hasPassword, !form.isChanging {
+                    Button("Change Password…") { form.isChanging = true; form.message = nil }
+                        .buttonStyle(PillButtonStyle(kind: .secondary))
                 }
-                Spacer(minLength: 0)
             }
+            if !hasPassword || form.isChanging { fields }
         }
         .padding(Spacing.lg)
+    }
+
+    @ViewBuilder private var fields: some View {
+        SecureField(hasPassword ? "New login password" : "Login password",
+                    text: Binding(get: { form.password }, set: { form.password = $0 }))
+            .textFieldStyle(.roundedBorder)
+        SecureField("Confirm password", text: Binding(get: { form.confirm }, set: { form.confirm = $0 }))
+            .textFieldStyle(.roundedBorder)
+        HStack(spacing: Spacing.md) {
+            Button(hasPassword ? "Update Password" : "Save Password") { save() }
+                .buttonStyle(PillButtonStyle(kind: .primary))
+                .disabled(form.password.isEmpty)
+            if hasPassword {
+                Button("Cancel") { form.isChanging = false; form.password = ""; form.confirm = ""; form.message = nil }
+                    .buttonStyle(PillButtonStyle(kind: .secondary))
+            }
+            if let message = form.message {
+                Text(message).font(Typography.caption)
+                    .foregroundStyle(form.messageIsError ? Theme.badText : Theme.goodText)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+        }
     }
 
     private func save() {
@@ -286,6 +305,7 @@ private struct LockScreenPane: View {
         let wasBlocked = model.actionError != nil
         form.password = ""; form.confirm = ""
         form.message = "Password saved."; form.messageIsError = false
+        form.isChanging = false
         form.saveCount += 1
         model.actionError = nil
         // They tried to turn the lock screen on and were stopped: finish what they asked for.
