@@ -236,15 +236,20 @@ private struct LockScreenPane: View {
         }
 
         PaneSection(header: "Unlock animation",
-                    footnote: "Minimal widens the notch just enough for a lock and a small animation. Original opens a large panel. Picking one plays a preview.") {
+                    footnote: "Choosing a style plays it at the top of your screen.") {
             SettingsCard {
-                Picker("Unlock animation", selection: Binding(get: { model.animationStyle }, set: { model.setAnimationStyle($0) })) {
-                    ForEach(UnlockAnimationStyle.allCases) { style in
-                        Text(style.title).tag(style)
+                switchRow("Play an animation when unlocking",
+                          isOn: Binding(get: { model.animationEnabled }, set: { model.setAnimationEnabled($0) }))
+                RowDivider()
+                ForEach(UnlockAnimationStyle.allCases) { style in
+                    AnimationChoiceRow(style: style, isSelected: model.animationStyle == style) {
+                        model.setAnimationStyle(style)
                     }
+                    if style != UnlockAnimationStyle.allCases.last { RowDivider() }
                 }
-                .pickerStyle(.segmented).labelsHidden()
-                .padding(Spacing.lg)
+                .disabled(!model.animationEnabled)
+                .opacity(model.animationEnabled ? 1 : 0.35)
+                .animation(.easeInOut(duration: 0.2), value: model.animationEnabled)
             }
         }
     }
@@ -555,5 +560,68 @@ private struct FaceActionRow: View {
 private struct PressableCardStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label.opacity(configuration.isPressed ? 0.75 : 1)
+    }
+}
+
+private extension UnlockAnimationStyle {
+    var detail: String {
+        switch self {
+        case .minimal: return "The notch widens just enough for a lock and a small scan."
+        case .original: return "A large panel opens with the full scan animation."
+        }
+    }
+}
+
+/// One row of the list: a small drawing of the result, its name and description, and a check when chosen.
+private struct AnimationChoiceRow: View {
+    let style: UnlockAnimationStyle
+    let isSelected: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: Spacing.lg) {
+                thumbnail
+                VStack(alignment: .leading, spacing: Spacing.xxs) {
+                    Text(style.title).font(Typography.rowTitle)
+                    CaptionText(style.detail)
+                }
+                Spacer(minLength: Spacing.sm)
+                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                    .font(.system(size: 18))
+                    .foregroundStyle(isSelected ? Theme.accent : Color.secondary.opacity(0.6))
+                    .accessibilityHidden(true)
+            }
+            .padding(.horizontal, Surface.rowInset).padding(.vertical, Spacing.md)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("\(style.title) unlock animation")
+        .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
+    }
+
+    /// A miniature menu-bar strip with the island drawn as it would appear.
+    private var thumbnail: some View {
+        ZStack(alignment: .top) {
+            RoundedRectangle(cornerRadius: Radius.md, style: Radius.style).fill(Color.primary.opacity(0.08))
+            switch style {
+            case .minimal:
+                HStack {
+                    Image(systemName: "lock.fill").font(.system(size: 8, weight: .semibold)).foregroundStyle(.white)
+                    Spacer(minLength: 0)
+                    Image(systemName: "faceid").font(.system(size: 9)).foregroundStyle(Theme.accent)
+                }
+                .padding(.horizontal, 8)
+                .frame(width: 58, height: 20)
+                .background(Color.black, in: Capsule())
+                .padding(.top, 10)
+            case .original:
+                Image(systemName: "faceid").font(.system(size: 20)).foregroundStyle(Theme.accent)
+                    .frame(width: 40, height: 40)
+                    .background(Color.black, in: RoundedRectangle(cornerRadius: 11, style: .continuous))
+                    .padding(.top, 8)
+            }
+        }
+        .frame(width: 84, height: 56)
     }
 }

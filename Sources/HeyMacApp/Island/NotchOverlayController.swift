@@ -34,12 +34,14 @@ final class NotchOverlayController {
     @ObservationIgnored private lazy var window = makeWindow()
     @ObservationIgnored private let elevated = LockScreenSpace()
     @ObservationIgnored private var isOnLockScreen = false
+    @ObservationIgnored private var isPreview = false
     @ObservationIgnored private var transitionTask: Task<Void, Never>?
     @ObservationIgnored private var pulseTask: Task<Void, Never>?
     @ObservationIgnored private var resolveTask: Task<Void, Never>?
     @ObservationIgnored private var scanTimeoutTask: Task<Void, Never>?
 
     func handle(_ event: EngineEvent) {
+        guard UnlockAnimationStyle.enabled else { return } // "Show animation" is off
         switch event {
         case .lockScreenScanning: beginScanning()
         case .lockScreenUnlocked: finish(success: true)
@@ -53,6 +55,7 @@ final class NotchOverlayController {
 
     /// Opens on the still. The screen is locked here, so the panel goes into the lock space.
     func beginScanning(onLockScreen: Bool = true, style: UnlockAnimationStyle? = nil) {
+        isPreview = false
         resolveTask?.cancel()
         scanTimeoutTask?.cancel()
         ensureOpen(onLockScreen: onLockScreen, style: style)
@@ -89,15 +92,43 @@ final class NotchOverlayController {
         }
     }
 
-    /// Plays a full scan → unlock in `style` on the desktop, for the Settings picker.
+    /// Plays a full scan → unlock in `style` on the desktop, for the Settings picker. Picking another
+    /// style while a preview is still playing cuts it short and starts the new one at once. A real
+    /// lock-screen episode is never interrupted.
     func preview(_ style: UnlockAnimationStyle) {
-        guard phase == .closed else { return }
+        if phase != .closed {
+            guard isPreview else { return }
+            cutShort()
+        }
         beginScanning(onLockScreen: false, style: style)
+        isPreview = true
         resolveTask = Task { [weak self] in
             try? await Task.sleep(for: .seconds(1.8))
             guard !Task.isCancelled else { return }
             self?.finish(success: true)
         }
+    }
+
+    /// Stops a Settings preview that is still playing. A real lock-screen episode is left alone.
+    func stopPreview() {
+        guard phase != .closed, isPreview else { return }
+        cutShort()
+    }
+
+    /// Ends the current episode immediately, without the closing animation.
+    private func cutShort() {
+        for task in [transitionTask, pulseTask, resolveTask, scanTimeoutTask] { task?.cancel() }
+        transitionTask = nil; pulseTask = nil; resolveTask = nil; scanTimeoutTask = nil
+        var transaction = Transaction(animation: nil)
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            isExpanded = false
+            isPulseDimmed = false
+            isLockOpen = false
+        }
+        phase = .closed
+        media = .idle
+        hideWindow()
     }
 
     /// Closes the island quietly when an episode is abandoned before any result (no clip).

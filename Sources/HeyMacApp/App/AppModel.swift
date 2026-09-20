@@ -29,6 +29,7 @@ final class AppModel {
     private(set) var strictness: MatchStrictness = .normal
     private(set) var launchAtLogin = true
     private(set) var animationStyle = UnlockAnimationStyle.saved
+    private(set) var animationEnabled = UnlockAnimationStyle.enabled
     private(set) var appLockEnabled = false
     private(set) var appLockApps: [LockedApp] = []
     private(set) var shieldMode = ShieldMode.saved
@@ -198,6 +199,18 @@ final class AppModel {
         UnlockAnimationStyle.saved = style
         animationStyle = style
         NotchOverlayController.shared.preview(style)
+    }
+
+    /// Turns the unlock animation on or off. Turning it on plays the current style once; turning it off
+    /// stops a preview that is still playing.
+    func setAnimationEnabled(_ enabled: Bool) {
+        UnlockAnimationStyle.enabled = enabled
+        animationEnabled = enabled
+        if enabled {
+            NotchOverlayController.shared.preview(animationStyle)
+        } else {
+            NotchOverlayController.shared.stopPreview()
+        }
     }
 
     func setStrictness(_ value: MatchStrictness) {
