@@ -14,10 +14,6 @@ Unlock your Mac's lock screen and secure individual apps with a single look.
 ![Privacy](https://img.shields.io/badge/100%25-On--Device-34C759?style=for-the-badge&logo=shield&logoColor=white)
 ![Views](https://komarev.com/ghpvc/?username=iharshitmaurya&repo=HeyMac&label=Views&color=0071E3&style=for-the-badge)
 
-<a href="https://github.com/iharshitmaurya/HeyMac/releases/latest/download/HeyMac.dmg">
-  <img src="https://img.shields.io/badge/⬇%20Install%20Hey%20Mac-0071E3?style=for-the-badge&logo=apple&logoColor=white" alt="Install Hey Mac"/>
-</a>
-
 </div>
 
 <br>
@@ -26,15 +22,25 @@ Unlock your Mac's lock screen and secure individual apps with a single look.
 
 ## 📦 Install
 
-**Homebrew**
+Two ways, pick whichever you like.
+
+### 1 · One click
+
+<a href="https://github.com/iharshitmaurya/HeyMac/releases/latest/download/HeyMac.dmg">
+  <img src="https://img.shields.io/badge/⬇%20Install%20Hey%20Mac-0071E3?style=for-the-badge&logo=apple&logoColor=white" alt="Install Hey Mac"/>
+</a>
+
+Open the downloaded `HeyMac.dmg` and drag **Hey Mac** into Applications. (All versions are on the [Releases](https://github.com/iharshitmaurya/HeyMac/releases) page.)
+
+### 2 · Homebrew
 
 ```sh
 brew install --cask iharshitmaurya/tap/heymac
 ```
 
-**Direct download:** use the button above, or grab `HeyMac.dmg` from [Releases](https://github.com/iharshitmaurya/HeyMac/releases/latest) and drag Hey Mac into Applications. Hey Mac isn't notarized, so if macOS blocks it, open System Settings → Privacy & Security and click **Open Anyway**.
+Hey Mac isn't notarized, so if macOS blocks it the first time, open System Settings → Privacy & Security and click **Open Anyway**.
 
-To remove it, use **Settings → About → Uninstall…** in the app (it also deletes your face data). With Homebrew, `brew uninstall --zap --cask heymac` removes the app and its data folder.
+**Uninstall:** use **Settings → About → Uninstall…** in the app (it also deletes your face data). With Homebrew, `brew uninstall --zap --cask heymac` removes the app and its data folder.
 
 ---
 
