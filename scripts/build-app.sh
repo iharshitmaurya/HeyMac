@@ -20,15 +20,15 @@ rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN/HeyMac" "$APP/Contents/MacOS/HeyMac"
 # SwiftPM's resource bundle holds the Core ML models; the app looks for it here.
-cp -R "$BIN/FaceUnlockDaemon_FaceUnlockCore.bundle" "$APP/Contents/Resources/"
-cp -R "$REPO_ROOT/Sources/FaceUnlockApp/Animations" "$APP/Contents/Resources/Animations"
+cp -R "$BIN/HeyMac_HeyMacCore.bundle" "$APP/Contents/Resources/"
+cp -R "$REPO_ROOT/Sources/HeyMacApp/Animations" "$APP/Contents/Resources/Animations"
 # Sparkle (the updater) is a framework the executable loads from Contents/Frameworks.
 SPARKLE="$(find "$REPO_ROOT/.build/artifacts/sparkle" -type d -name Sparkle.framework -path '*macos-arm64_x86_64*' | head -1)"
 [ -d "$SPARKLE" ] || { echo "Sparkle.framework not found; run swift build first" >&2; exit 1; }
 mkdir -p "$APP/Contents/Frameworks"
 cp -R "$SPARKLE" "$APP/Contents/Frameworks/"
 mkdir -p "$APP/Contents/Library/LaunchAgents"
-cp "$PACKAGING/com.faceunlock.app.agent.plist" "$APP/Contents/Library/LaunchAgents/"
+cp "$PACKAGING/com.heymac.app.agent.plist" "$APP/Contents/Library/LaunchAgents/"
 # One-time cleanup of the sudo hook that older versions installed (run by the app on first launch).
 cp "$PACKAGING/uninstall-sudo-hook.sh" "$APP/Contents/Resources/"
 cp "$REPO_ROOT/THIRD_PARTY_NOTICES.md" "$APP/Contents/Resources/"
@@ -51,7 +51,7 @@ for nested in "$SPK/XPCServices/Installer.xpc" "$SPK/XPCServices/Downloader.xpc"
     [ -e "$nested" ] && sign_nested "$nested"
 done
 sign_nested "$APP/Contents/Frameworks/Sparkle.framework"
-sign_code "$APP" com.faceunlock.app
+sign_code "$APP" com.heymac.app
 codesign --verify --deep --strict "$APP"
 if ! signing_identity_available; then
     echo "note: signed ad-hoc. Run scripts/create-signing-identity.sh once so permissions survive app updates." >&2

@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
 	<key>CFBundleIdentifier</key>
-	<string>com.faceunlock.app</string>
+	<string>com.heymac.app</string>
 	<key>CFBundleName</key>
 	<string>Hey Mac</string>
 	<key>CFBundleDisplayName</key>

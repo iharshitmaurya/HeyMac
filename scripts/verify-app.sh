@@ -10,14 +10,14 @@ fail() { echo "FAIL: $*" >&2; exit 1; }
 for path in \
     Contents/MacOS/HeyMac \
     Contents/Info.plist \
-    Contents/Resources/FaceUnlockDaemon_FaceUnlockCore.bundle \
+    Contents/Resources/HeyMac_HeyMacCore.bundle \
     Contents/Resources/Animations/unlockstatic.png \
     Contents/Resources/Animations/unlockanimation.mp4 \
     Contents/Resources/Animations/unsuccessfulunlockanimation.mp4 \
     Contents/Resources/uninstall-sudo-hook.sh \
     Contents/Resources/THIRD_PARTY_NOTICES.md \
     Contents/Frameworks/Sparkle.framework \
-    Contents/Library/LaunchAgents/com.faceunlock.app.agent.plist
+    Contents/Library/LaunchAgents/com.heymac.app.agent.plist
 do
     [ -e "$APP/$path" ] || fail "missing $path"
 done

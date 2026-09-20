@@ -2,31 +2,31 @@
 import PackageDescription
 
 let package = Package(
-    name: "FaceUnlockDaemon",
+    name: "HeyMac",
     platforms: [.macOS(.v14)],
     products: [
-        .executable(name: "HeyMac", targets: ["FaceUnlockApp"]),
+        .executable(name: "HeyMac", targets: ["HeyMacApp"]),
     ],
     dependencies: [
         .package(url: "https://github.com/sparkle-project/Sparkle", from: "2.6.0"),
     ],
     targets: [
         .target(
-            name: "FaceUnlockCore",
+            name: "HeyMacCore",
             resources: [
                 .copy("Resources/ArcFace.mlpkgdata"),
                 .copy("Resources/AntiSpoof.mlpkgdata"),
             ]
         ),
         .target(
-            name: "FaceUnlockEngine",
-            dependencies: ["FaceUnlockCore"],
+            name: "HeyMacEngine",
+            dependencies: ["HeyMacCore"],
             swiftSettings: [.swiftLanguageMode(.v5)]
         ),
         .executableTarget(
-            name: "FaceUnlockApp",
+            name: "HeyMacApp",
             dependencies: [
-                "FaceUnlockCore", "FaceUnlockEngine",
+                "HeyMacCore", "HeyMacEngine",
                 .product(name: "Sparkle", package: "Sparkle"),
             ],
             exclude: ["Animations"],
@@ -35,13 +35,13 @@ let package = Package(
             linkerSettings: [.unsafeFlags(["-Xlinker", "-rpath", "-Xlinker", "@executable_path/../Frameworks"])]
         ),
         .testTarget(
-            name: "FaceUnlockCoreTests",
-            dependencies: ["FaceUnlockCore"],
+            name: "HeyMacCoreTests",
+            dependencies: ["HeyMacCore"],
             resources: [.copy("Fixtures")]
         ),
         .testTarget(
-            name: "FaceUnlockEngineTests",
-            dependencies: ["FaceUnlockEngine", "FaceUnlockCore"],
+            name: "HeyMacEngineTests",
+            dependencies: ["HeyMacEngine", "HeyMacCore"],
             swiftSettings: [.swiftLanguageMode(.v5)]
         ),
     ]

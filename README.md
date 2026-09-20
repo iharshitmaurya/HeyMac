@@ -45,4 +45,4 @@ Security is not an afterthought; it is the foundation of Hey Mac. This applicati
 
 *   **Zero Photo Storage:** Hey Mac does not save images of your face. It generates a mathematical, numeric embedding of your facial structure, encrypted securely within the native **macOS Keychain**.
 *   **Advanced Anti-Spoofing:** Built-in liveness detection ensures a physical, three-dimensional human is present. It actively rejects photographs, screens, or printed masks.
-*   **Daemon Protection:** If Hey Mac is securing an app, quitting the daemon requires biometric authentication. A persistent background launch agent ensures the security layer cannot be bypassed by force-quitting the process.
+*   **Quit Protection:** If Hey Mac is securing an app, quitting the app requires biometric authentication. A persistent background launch agent ensures the security layer cannot be bypassed by force-quitting the process.
