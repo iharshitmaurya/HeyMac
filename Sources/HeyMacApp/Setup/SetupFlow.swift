@@ -178,23 +178,39 @@ final class SetupFlow {
 
     // MARK: - Password
 
-    func saveLoginPassword() {
+    @discardableResult
+    func saveLoginPassword() -> Bool {
         guard !password.isEmpty else {
             passwordMessage = "Enter your login password."
-            return
+            return false
         }
         guard password == passwordConfirm else {
             passwordMessage = "The two passwords don't match."
-            return
+            return false
         }
         if let error = model.saveLoginPassword(password) {
             passwordMessage = error
-            return
+            return false
         }
         password = ""
         passwordConfirm = ""
         passwordMessage = "Password saved."
         model.setLockScreenEnabled(true)
+        return true
+    }
+
+    /// Continue on the features step. If the lock-screen switch is on but no password is saved yet,
+    /// save what was typed rather than dropping it, and stop with a message if there's nothing to save.
+    func continueFromFeatures() {
+        let needsPassword = lockScreenWanted && !(model.runtime?.hasLoginPassword ?? false)
+        if needsPassword {
+            if password.isEmpty && passwordConfirm.isEmpty {
+                passwordMessage = "Enter your login password below, or turn this switch off to skip it."
+                return
+            }
+            guard saveLoginPassword() else { return }
+        }
+        advance()
     }
 
     /// Flips the lock-screen switch. With a saved password it applies at once; without one the

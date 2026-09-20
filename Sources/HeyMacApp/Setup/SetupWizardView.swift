@@ -170,7 +170,7 @@ struct SetupWizardView: View {
                 primary("Try Again") { flow.runTest() }
             }
         case .features:
-            primary("Continue") { flow.advance() }
+            primary("Continue") { flow.continueFromFeatures() }
         case .done:
             primary("Done") { flow.finish() }
         }
