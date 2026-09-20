@@ -216,7 +216,7 @@ private struct LockScreenPane: View {
         }
 
         PaneSection(header: "Login password",
-                    footnote: "Hey Mac types this at the lock screen after your face matches. It is stored encrypted in your Keychain and never leaves this Mac.") {
+                    footnote: "Your face can't unlock a Mac by itself, so Hey Mac types your password for you after it recognizes you. It's stored encrypted on this Mac and never sent anywhere.") {
             SettingsCard { passwordForm }
         }
 

@@ -430,7 +430,7 @@ struct SetupWizardView: View {
                 tile("lock.fill")
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Unlock the lock screen").font(.system(size: 13, weight: .medium)).lineLimit(1)
-                    Text(flow.passwordMessage ?? "Needs your login password. It stays on this Mac.")
+                    Text(flow.passwordMessage ?? "Your face can't unlock a Mac by itself, so Hey Mac types your password for you after it recognizes you. It's stored encrypted on this Mac and never sent anywhere.")
                         .font(.system(size: 11)).foregroundStyle(passwordMessageColor)
                         .fixedSize(horizontal: false, vertical: true)
                 }
