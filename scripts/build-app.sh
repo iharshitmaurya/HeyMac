@@ -16,6 +16,7 @@ echo "Building executables (release)..."
 BIN="$(cd "$REPO_ROOT" && swift build -c release --show-bin-path)"
 
 echo "Assembling $APP..."
+mkdir -p "$DIST" && touch "$DIST/.metadata_never_index"  # keeps Spotlight from listing this build copy as an installed app
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN/HeyMac" "$APP/Contents/MacOS/HeyMac"
