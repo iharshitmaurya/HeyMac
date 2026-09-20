@@ -306,37 +306,60 @@ private struct FacePane: View {
     let model: AppModel
 
     var body: some View {
-        PaneTitle("Face Data")
+        header
 
-        SettingsCard {
-            HStack(spacing: Spacing.md) {
-                Image(systemName: "faceid")
-                    .font(.system(size: 22, weight: .regular))
-                    .foregroundStyle(model.setupComplete ? Theme.accentText : Color.secondary)
-                    .frame(width: IconSize.avatar, height: IconSize.avatar)
-                    .background(Color.primary.opacity(0.06), in: Circle())
-                    .accessibilityHidden(true)
-                VStack(alignment: .leading, spacing: Spacing.xxs) {
-                    Text(model.setupComplete ? "Enrolled" : "Not enrolled").font(Typography.rowTitle).lineLimit(1)
-                    Text(model.setupComplete ? "Stored encrypted on this Mac" : "Run setup to enroll your face")
-                        .font(Typography.caption).foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                Spacer(minLength: 0)
-            }
-            .padding(Spacing.lg)
+        statusCard
+
+        VStack(spacing: Spacing.md) {
+            FaceActionRow(icon: "faceid", title: "Test Now…",
+                          caption: "Check if your face is recognized correctly.", tone: .neutral) { model.openTest() }
+            FaceActionRow(icon: "arrow.triangle.2.circlepath", title: "Re-enroll My Face…",
+                          caption: "Update your face data with a new scan.", tone: .neutral) { model.reEnroll() }
+            FaceActionRow(icon: "trash", title: "Remove My Face Data…",
+                          caption: "Removes your face data and disables face unlock.", tone: .danger) { confirmRemoval() }
         }
+        .disabled(!model.setupComplete)
 
-        PaneSection(footnote: "Removing your face data also turns off lock-screen unlock, and deletes the stored password.") {
-            // Always stacked: two long pills side by side clip below ~700pt.
-            VStack(alignment: .leading, spacing: Spacing.sm) { buttons }
+        HStack(alignment: .top, spacing: Spacing.sm) {
+            Image(systemName: "info.circle").foregroundStyle(.secondary).accessibilityHidden(true)
+            CaptionText("Removing your face data also turns off lock-screen unlock, and deletes the stored password.")
+        }
+        .padding(.horizontal, Spacing.xs)
+    }
+
+    private var header: some View {
+        HStack(spacing: Spacing.lg) {
+            Image(systemName: "faceid")
+                .font(.system(size: 22, weight: .regular))
+                .foregroundStyle(Theme.accentText)
+                .frame(width: 48, height: 48)
+                .background(Theme.accent.opacity(0.16), in: RoundedRectangle(cornerRadius: Radius.lg, style: Radius.style))
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: Spacing.xxs) {
+                PaneTitle("Face Data")
+                CaptionText("Manage the face data used for unlocking your Mac.")
+            }
+            Spacer(minLength: 0)
         }
     }
 
-    @ViewBuilder private var buttons: some View {
-        Button("Test Now…") { model.openTest() }.buttonStyle(PillButtonStyle(kind: .secondary))
-        Button("Re-enroll My Face…") { model.reEnroll() }.buttonStyle(PillButtonStyle(kind: .secondary))
-        Button("Remove My Face Data…") { confirmRemoval() }.buttonStyle(PillButtonStyle(kind: .danger))
+    /// Enrolled: a green confirmation. Not enrolled: a prompt that starts setup.
+    @ViewBuilder private var statusCard: some View {
+        if model.setupComplete {
+            FaceCard(fill: Theme.good.opacity(0.12), stroke: Theme.good.opacity(0.35)) {
+                HStack(spacing: Spacing.lg) {
+                    FaceIconCircle(icon: "checkmark.shield.fill", tint: Theme.good, ink: Theme.goodText)
+                    VStack(alignment: .leading, spacing: Spacing.xxs) {
+                        Text("Enrolled").font(Typography.sectionTitle)
+                        CaptionText("Your face data is securely stored on this Mac.")
+                    }
+                    Spacer(minLength: 0)
+                }
+            }
+        } else {
+            FaceActionRow(icon: "person.crop.circle.badge.plus", title: "Not enrolled",
+                          caption: "Set up Hey Mac to enroll your face.", tone: .prompt) { model.openSetup() }
+        }
     }
 
     /// Cancel is the default (Return) button; the destructive confirm is second and never the default.
@@ -412,5 +435,93 @@ private struct AboutPane: View {
 
     private func license(_ text: String) -> some View {
         Text(text).font(Typography.mono).foregroundStyle(.secondary).lineLimit(1)
+    }
+}
+
+
+// MARK: - Face Data pieces
+
+private struct FaceCard<Content: View>: View {
+    let fill: Color
+    let stroke: Color
+    @ViewBuilder let content: () -> Content
+    var body: some View {
+        content()
+            .padding(Spacing.lg)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(fill, in: RoundedRectangle(cornerRadius: Radius.lg, style: Radius.style))
+            .overlay(RoundedRectangle(cornerRadius: Radius.lg, style: Radius.style).stroke(stroke, lineWidth: 1))
+    }
+}
+
+private struct FaceIconCircle: View {
+    let icon: String
+    let tint: Color
+    let ink: Color
+    var body: some View {
+        Image(systemName: icon)
+            .font(.system(size: 18, weight: .semibold))
+            .foregroundStyle(ink)
+            .frame(width: 44, height: 44)
+            .background(tint.opacity(0.18), in: Circle())
+            .accessibilityHidden(true)
+    }
+}
+
+/// A tappable card: icon, title, one-line caption, chevron. `danger` tints it red; `prompt` amber.
+private struct FaceActionRow: View {
+    enum Tone { case neutral, danger, prompt }
+    let icon: String
+    let title: String
+    let caption: String
+    let tone: Tone
+    let action: () -> Void
+
+    @Environment(\.isEnabled) private var isEnabled
+
+    private var ink: Color {
+        switch tone {
+        case .neutral: return Theme.accentText
+        case .danger: return Theme.badText
+        case .prompt: return Theme.warnText
+        }
+    }
+    private var tint: Color {
+        switch tone {
+        case .neutral: return Theme.accent
+        case .danger: return Theme.bad
+        case .prompt: return Theme.warn
+        }
+    }
+
+    var body: some View {
+        Button(action: action) {
+            FaceCard(fill: tone == .neutral ? Surface.card : tint.opacity(0.10),
+                     stroke: tone == .neutral ? Surface.hairline : tint.opacity(0.35)) {
+                HStack(spacing: Spacing.lg) {
+                    FaceIconCircle(icon: icon, tint: tint, ink: ink)
+                    VStack(alignment: .leading, spacing: Spacing.xxs) {
+                        Text(title).font(Typography.sectionTitle)
+                            .foregroundStyle(tone == .danger ? Theme.badText : Color.primary)
+                        CaptionText(caption)
+                    }
+                    Spacer(minLength: Spacing.sm)
+                    Image(systemName: "chevron.right").font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.secondary).accessibilityHidden(true)
+                }
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(PressableCardStyle())
+        .opacity(isEnabled ? 1 : 0.5)
+        .accessibilityLabel(title)
+        .accessibilityHint(caption)
+    }
+}
+
+/// Dims slightly while pressed; the card itself supplies all the visuals.
+private struct PressableCardStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label.opacity(configuration.isPressed ? 0.75 : 1)
     }
 }
