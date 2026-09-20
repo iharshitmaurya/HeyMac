@@ -3,7 +3,7 @@
 # Usage: scripts/release.sh VERSION [--publish]
 #   Without --publish: builds dist/HeyMac-VERSION.dmg and dist/appcast.xml and stops.
 #   With --publish:    also creates the GitHub release vVERSION with the DMG (versioned and as HeyMac.dmg)
-#                      and appcast attached, so the README's download button and
+#                      and appcast attached, and bumps the Homebrew cask in iharshitmaurya/homebrew-tap, so the README's download button and
 #                      installed copies find the update at releases/latest/download/appcast.xml.
 # The DMG is signed with the private key that `generate_keys` stored in your login Keychain;
 # it must match SUPublicEDKey in packaging/Info.plist.
@@ -48,6 +48,19 @@ echo "Wrote $APPCAST"
 if [ "$PUBLISH" = "--publish" ]; then
     gh release create "v$VERSION" "$DMG" "$LATEST_DMG" "$APPCAST" --repo "$REPO" --title "Hey Mac $VERSION" --generate-notes
     echo "Published v$VERSION"
+
+    # Point the Homebrew cask at this release, so `brew install --cask iharshitmaurya/tap/heymac` gets it.
+    TAP_DIR="$(mktemp -d)"
+    gh repo clone iharshitmaurya/homebrew-tap "$TAP_DIR" -- -q
+    SHA256="$(shasum -a 256 "$DMG" | cut -d' ' -f1)"
+    sed -i '' -e "s/^  version \".*\"/  version \"$VERSION\"/" -e "s/^  sha256 \".*\"/  sha256 \"$SHA256\"/" "$TAP_DIR/Casks/heymac.rb"
+    if ! git -C "$TAP_DIR" diff --quiet; then
+        git -C "$TAP_DIR" -c user.name="Harshit Maurya" -c user.email="46915044+iharshitmaurya@users.noreply.github.com" \
+            commit -qam "Update heymac to $VERSION"
+        git -C "$TAP_DIR" push -q
+        echo "Updated the Homebrew cask to $VERSION"
+    fi
+    rm -rf "$TAP_DIR"
 else
     echo "Not published. Re-run with --publish to create the GitHub release."
 fi

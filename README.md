@@ -24,6 +24,20 @@ Unlock your Mac's lock screen and secure individual apps with a single look.
 
 ---
 
+## 📦 Install
+
+**Homebrew**
+
+```sh
+brew install --cask iharshitmaurya/tap/heymac
+```
+
+**Direct download:** use the button above, or grab `HeyMac.dmg` from [Releases](https://github.com/iharshitmaurya/HeyMac/releases/latest) and drag Hey Mac into Applications. Hey Mac isn't notarized, so if macOS blocks it, open System Settings → Privacy & Security and click **Open Anyway**.
+
+To remove it, use **Settings → About → Uninstall…** in the app (it also deletes your face data). With Homebrew, `brew uninstall --zap --cask heymac` removes the app and its data folder.
+
+---
+
 ## ✨ Features
 
 Hey Mac bridges the gap between iOS-level convenience and macOS security, bringing native-feeling facial recognition to your desktop.
