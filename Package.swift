@@ -13,8 +13,6 @@ let package = Package(
             resources: [
                 .copy("Resources/ArcFace.mlpkgdata"),
                 .copy("Resources/AntiSpoof.mlpkgdata"),
-                .copy("Resources/ArcFace.LICENSE.txt"),
-                .copy("Resources/AntiSpoof.LICENSE.txt"),
             ]
         ),
         .target(

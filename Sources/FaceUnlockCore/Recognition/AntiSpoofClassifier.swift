@@ -24,7 +24,7 @@ public protocol LivenessChecking {
 /// MiniFASNetV2 (2.7_80x80) from minivision-ai/Silent-Face-Anti-Spoofing. Input preparation
 /// mirrors upstream test.py exactly: grow the detector box 2.7x (clamped/shifted into the
 /// frame), cv2-style bilinear resize to 80x80, BGR raw 0-255 (the BGR order and lack of
-/// scaling are baked into the converted model — see AntiSpoof.LICENSE.txt).
+/// scaling are baked into the converted model; see THIRD_PARTY_NOTICES.md).
 public final class AntiSpoofClassifier: LivenessChecking {
     /// Upstream's 2.7 is relative to its RetinaFace box; Vision's face box measured ~12%
     /// larger on the same webcam frame (531 vs 475 px), so 2.7 × 475/531 ≈ 2.4 frames the

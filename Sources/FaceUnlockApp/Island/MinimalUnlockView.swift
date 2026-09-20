@@ -1,46 +1,53 @@
-//  Layout: [ lock ][ gap ][ clip ]. For the notch the gap is the physical cutout
-//  (nothing may be drawn there); for the pill it is just negative space.
+//  The compact island's content: a lock glyph on the leading side, the scan clip on the
+//  trailing side, and open space between them. On a notch that space is the cutout, so
+//  nothing is drawn there.
 
 import SwiftUI
 
 struct MinimalUnlockView: View {
     let media: ScanMedia
     let isUnlocked: Bool
-    /// Inset from the silhouette's left/right edges; the caller adds the notch's flare in.
-    let edgeInset: CGFloat
-    let lockIconSize: CGFloat
-    let mediaWidth: CGFloat
-    let mediaVerticalInset: CGFloat
-    /// Applied to the clip only, so the lock glyph stays steady while it breathes.
+    /// Distance from the outline's left and right edges. The caller adds the notch's ear width.
+    let sideInset: CGFloat
+    let glyphSize: CGFloat
+    let clipWidth: CGFloat
+    let clipInset: CGFloat
+    /// Applied to the clip only, so the lock glyph stays still while the clip breathes.
     let pulseScale: CGFloat
     let pulseOpacity: Double
 
     var body: some View {
         HStack(spacing: 0) {
-            Image(systemName: isUnlocked ? "lock.open.fill" : "lock.fill")
-                .font(.system(size: lockIconSize, weight: .semibold))
-                .foregroundStyle(Color.white)
-                .lockTransition()
-                // The phase change that flips `isUnlocked` isn't itself in an animation transaction.
-                .animation(.smooth(duration: NotchGeometry.minimalLockAnimationDuration), value: isUnlocked)
-                .frame(width: mediaWidth)
-
+            lockGlyph
             Spacer(minLength: 0)
-
-            ScanAnimationView(media: media)
-                .padding(.vertical, mediaVerticalInset)
-                .frame(width: mediaWidth)
-                .scaleEffect(pulseScale)
-                .opacity(pulseOpacity)
-                .padding(.trailing, 4)
+            clip
         }
-        .padding(.horizontal, edgeInset)
+        .padding(.horizontal, sideInset)
+    }
+
+    private var lockGlyph: some View {
+        Image(systemName: isUnlocked ? "lock.open.fill" : "lock.fill")
+            .font(.system(size: glyphSize, weight: .semibold))
+            .foregroundStyle(.white)
+            .symbolMorph()
+            // The phase change that flips `isUnlocked` isn't in an animation transaction of its own.
+            .animation(.smooth(duration: IslandMotion.lockMorph), value: isUnlocked)
+            .frame(width: clipWidth)
+    }
+
+    private var clip: some View {
+        ScanAnimationView(media: media)
+            .padding(.vertical, clipInset)
+            .frame(width: clipWidth)
+            .scaleEffect(pulseScale)
+            .opacity(pulseOpacity)
+            .padding(.trailing, 4)
     }
 }
 
 private extension View {
-    /// The "magic" morph is macOS 15+; older systems get the plain replace.
-    @ViewBuilder func lockTransition() -> some View {
+    /// The "magic" symbol morph needs macOS 15; earlier systems get a plain replace.
+    @ViewBuilder func symbolMorph() -> some View {
         if #available(macOS 15, *) {
             contentTransition(.symbolEffect(.replace.magic(fallback: .replace)))
         } else {

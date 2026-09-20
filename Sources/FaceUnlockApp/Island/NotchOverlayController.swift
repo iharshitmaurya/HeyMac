@@ -1,12 +1,12 @@
-//  Drives the notch island through one lock episode: opens on the still while scanning,
-//  plays the unlock / rejected clip, then collapses. The animated flags (`isExpanded`,
+//  Runs the island through one lock episode: opens on the still image while scanning,
+//  plays the unlock or rejected clip, then collapses. The animated flags (`isExpanded`,
 //  `isPositioned`, `isPulseDimmed`) are flipped here inside `withAnimation`, with real
-//  `Task.sleep` delays for the staggers — two `.animation(value:)` modifiers can't be
-//  relied on to stagger.
+//  `Task.sleep` gaps for the staggering, because chained `.animation(value:)` modifiers
+//  don't stagger reliably.
 //
-//  The window is an ordinary click-through panel. What makes it visible while the screen
-//  is locked is `LockScreenSpace`, and only for as long as the screen is still locked:
-//  once the unlock lands the panel is pulled back out, so nothing stays pinned there.
+//  The window is an ordinary click-through panel. `LockScreenSpace` is what makes it
+//  visible on the lock screen, and only while the screen is still locked; once the unlock
+//  lands the panel is pulled back out so nothing stays pinned there.
 
 import AppKit
 import FaceUnlockEngine
@@ -61,7 +61,7 @@ final class NotchOverlayController {
         phase = .scanning
         startPulse()
         scanTimeoutTask = Task { [weak self] in
-            try? await Task.sleep(for: .seconds(NotchGeometry.scanTimeout))
+            try? await Task.sleep(for: .seconds(IslandMotion.scanTimeout))
             guard !Task.isCancelled else { return }
             self?.cancelScanning()
         }
@@ -81,7 +81,7 @@ final class NotchOverlayController {
             place(onLockScreen: false)
             NSHapticFeedbackManager.defaultPerformer.perform(.levelChange, performanceTime: .default)
         }
-        let hold = success ? NotchGeometry.successHold : NotchGeometry.failureHold
+        let hold = success ? IslandMotion.successHold : IslandMotion.failureHold
         resolveTask = Task { [weak self] in
             try? await Task.sleep(for: .seconds(hold))
             guard !Task.isCancelled else { return }
@@ -115,13 +115,13 @@ final class NotchOverlayController {
         transitionTask?.cancel()
         let isPill = geometry.style == .pill
         transitionTask = Task { [weak self] in
-            withAnimation(Self.spring(NotchGeometry.closeSpring)) { self?.isExpanded = false }
+            withAnimation(Self.spring(IslandMotion.closeSpring)) { self?.isExpanded = false }
             if isPill {
-                try? await Task.sleep(for: .seconds(NotchGeometry.pillExitSlideDelay))
+                try? await Task.sleep(for: .seconds(IslandMotion.pillExitDelay))
                 guard !Task.isCancelled else { return }
                 withAnimation(Self.slide) { self?.isPositioned = false }
             }
-            try? await Task.sleep(for: .seconds(NotchGeometry.collapseDuration))
+            try? await Task.sleep(for: .seconds(IslandMotion.collapse))
             guard !Task.isCancelled, let self else { return }
             self.phase = .closed
             self.media = .idle
@@ -152,10 +152,10 @@ final class NotchOverlayController {
             guard !Task.isCancelled, let self else { return }
             if isPill, !self.isPositioned {
                 withAnimation(Self.slide) { self.isPositioned = true }
-                try? await Task.sleep(for: .seconds(NotchGeometry.pillEnterExpansionDelay))
+                try? await Task.sleep(for: .seconds(IslandMotion.pillEnterDelay))
                 guard !Task.isCancelled else { return }
             }
-            withAnimation(Self.spring(NotchGeometry.openSpring)) { self.isExpanded = true }
+            withAnimation(Self.spring(IslandMotion.openSpring)) { self.isExpanded = true }
         }
     }
 
@@ -164,15 +164,15 @@ final class NotchOverlayController {
     /// discrete half-cycles let `stopPulse()` retarget mid-flight from the rendered value.
     private func startPulse() {
         guard pulseTask == nil else { return }
-        let entry = (geometry.style == .pill ? NotchGeometry.pillEnterExpansionDelay : 0)
-            + NotchGeometry.scanPulseStartDelay
+        let entry = (geometry.style == .pill ? IslandMotion.pillEnterDelay : 0)
+            + IslandMotion.pulseStartDelay
         pulseTask = Task { [weak self] in
             try? await Task.sleep(for: .seconds(entry))
-            let half = NotchGeometry.scanPulseHalfCycle
+            let half = IslandMotion.pulseHalfCycle
             while !Task.isCancelled {
                 for dimmed in [true, false] {
                     withAnimation(.easeInOut(duration: half)) { self?.isPulseDimmed = dimmed }
-                    try? await Task.sleep(for: .seconds(half + NotchGeometry.scanPulseHold))
+                    try? await Task.sleep(for: .seconds(half + IslandMotion.pulseHold))
                     if Task.isCancelled { return }
                 }
             }
@@ -183,7 +183,7 @@ final class NotchOverlayController {
         pulseTask?.cancel()
         pulseTask = nil
         guard isPulseDimmed else { return }
-        withAnimation(.easeOut(duration: NotchGeometry.scanPulseSettle)) { isPulseDimmed = false }
+        withAnimation(.easeOut(duration: IslandMotion.pulseSettle)) { isPulseDimmed = false }
     }
 
     // MARK: - Window
@@ -193,7 +193,7 @@ final class NotchOverlayController {
     }
 
     /// A straight-line move, not a bouncy resize.
-    private static let slide = Animation.easeOut(duration: NotchGeometry.pillSlideDuration)
+    private static let slide = Animation.easeOut(duration: IslandMotion.pillSlide)
 
     private func place(onLockScreen: Bool) {
         reposition()
@@ -222,7 +222,7 @@ final class NotchOverlayController {
 
     /// Fixed size, created once and never resized — all growth is SwiftUI inside it.
     private func makeWindow() -> NSPanel {
-        let size = NotchGeometry.windowSize
+        let size = IslandMetrics.windowSize
         let panel = NSPanel(
             contentRect: NSRect(origin: .zero, size: size),
             styleMask: [.borderless, .nonactivatingPanel],
