@@ -270,8 +270,12 @@ final class SetupFlow {
     }
 
     func close() {
+        model.windows.close(id: "setup") // its onClose calls teardown()
+    }
+
+    /// Runs whenever the wizard window closes, however it was closed: stops the camera and any pending step.
+    func teardown() {
         advanceTask?.cancel()
         stopPreview()
-        model.windows.close(id: "setup")
     }
 }

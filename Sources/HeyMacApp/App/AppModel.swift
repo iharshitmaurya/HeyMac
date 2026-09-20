@@ -390,14 +390,16 @@ final class AppModel {
 
     func openSetup() {
         let flow = SetupFlow(model: self, startAt: .welcome)
-        windows.show(id: "setup", title: "Set Up Hey Mac", size: CGSize(width: 720, height: 540), resizable: true, minSize: CGSize(width: 640, height: 500)) {
+        windows.show(id: "setup", title: "Set Up Hey Mac", size: CGSize(width: 720, height: 540), resizable: true, minSize: CGSize(width: 640, height: 500),
+                     replacing: true, onClose: { flow.teardown() }) {
             SetupWizardView(flow: flow)
         }
     }
 
     func openTest() {
         let flow = SetupFlow(model: self, startAt: .test)
-        windows.show(id: "setup", title: "Test Hey Mac", size: CGSize(width: 720, height: 540), resizable: true, minSize: CGSize(width: 640, height: 500)) {
+        windows.show(id: "setup", title: "Test Hey Mac", size: CGSize(width: 720, height: 540), resizable: true, minSize: CGSize(width: 640, height: 500),
+                     replacing: true, onClose: { flow.teardown() }) {
             SetupWizardView(flow: flow)
         }
     }
@@ -409,7 +411,8 @@ final class AppModel {
         reloadSettings()
         stopEngine()
         let flow = SetupFlow(model: self, startAt: .enroll)
-        windows.show(id: "setup", title: "Re-enroll Your Face", size: CGSize(width: 720, height: 540), resizable: true, minSize: CGSize(width: 640, height: 500)) {
+        windows.show(id: "setup", title: "Re-enroll Your Face", size: CGSize(width: 720, height: 540), resizable: true, minSize: CGSize(width: 640, height: 500),
+                     replacing: true, onClose: { flow.teardown() }) {
             SetupWizardView(flow: flow)
         }
     }
