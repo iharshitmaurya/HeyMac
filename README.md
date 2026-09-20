@@ -14,7 +14,7 @@ Unlock your Mac's lock screen and secure individual apps with a single look.
 ![Privacy](https://img.shields.io/badge/100%25-On--Device-34C759?style=for-the-badge&logo=shield&logoColor=white)
 ![Views](https://komarev.com/ghpvc/?username=iharshitmaurya&repo=HeyMac&label=Views&color=0071E3&style=for-the-badge)
 
-<a href="https://github.com/iharshitmaurya/HeyMac/releases/latest">
+<a href="https://github.com/iharshitmaurya/HeyMac/releases/latest/download/HeyMac.dmg">
   <img src="https://img.shields.io/badge/⬇%20Install%20Hey%20Mac-0071E3?style=for-the-badge&logo=apple&logoColor=white" alt="Install Hey Mac"/>
 </a>
 
