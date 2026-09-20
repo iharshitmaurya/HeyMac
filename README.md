@@ -20,30 +20,6 @@ Unlock your Mac's lock screen and secure individual apps with a single look.
 
 ---
 
-## 📦 Install
-
-Two ways, pick whichever you like.
-
-### 1 · One click
-
-<a href="https://github.com/iharshitmaurya/HeyMac/releases/latest/download/HeyMac.dmg">
-  <img src="https://img.shields.io/badge/⬇%20Install%20Hey%20Mac-0071E3?style=for-the-badge&logo=apple&logoColor=white" alt="Install Hey Mac"/>
-</a>
-
-Open the downloaded `HeyMac.dmg` and drag **Hey Mac** into Applications. (All versions are on the [Releases](https://github.com/iharshitmaurya/HeyMac/releases) page.)
-
-### 2 · Homebrew
-
-```sh
-brew install --cask iharshitmaurya/tap/heymac
-```
-
-Hey Mac isn't notarized, so if macOS blocks it the first time, open System Settings → Privacy & Security and click **Open Anyway**.
-
-**Uninstall:** use **Settings → About → Uninstall…** in the app (it also deletes your face data). With Homebrew, `brew uninstall --zap --cask heymac` removes the app and its data folder.
-
----
-
 ## ✨ Features
 
 Hey Mac bridges the gap between iOS-level convenience and macOS security, bringing native-feeling facial recognition to your desktop.
@@ -54,6 +30,26 @@ Hey Mac bridges the gap between iOS-level convenience and macOS security, bringi
 *   ⏱️ **Intelligent Relock Policies:** Granular control per application. Require authentication immediately upon launch, after a set duration (5-15 mins), or gracefully lock after you switch focus away from the app.
 *   🏝️ **Dynamic Notch Island:** A fluid, native-feeling UI drops down from the macOS notch, providing instant visual feedback during biometric scans.
 *   🧑‍🚀 **Frictionless Onboarding:** A polished 6-step setup wizard guides you through camera permissions, facial enrollment, testing, and security preferences.
+
+---
+
+## 📦 Install
+
+### Download
+
+Download the latest `.dmg` and drag **Hey Mac** into your Applications folder.
+
+<a href="https://github.com/iharshitmaurya/HeyMac/releases/latest/download/HeyMac.dmg">
+  <img src="https://img.shields.io/badge/↓%20Download%20HeyMac-0071E3?style=for-the-badge&logo=apple&logoColor=white" alt="Download Hey Mac"/>
+</a>
+
+### Homebrew
+
+```bash
+brew install --cask iharshitmaurya/tap/heymac
+```
+
+> Hey Mac is currently not notarized. If macOS blocks the app, go to **System Settings → Privacy & Security → Open Anyway**.
 
 ---
 
