@@ -305,6 +305,22 @@ private struct AboutPane: View {
             .padding(Spacing.lg)
         }
 
+        if AppUpdater.shared.isAvailable {
+            PaneSection(header: "Updates") {
+                SettingsCard {
+                    FormRow(title: "Check for updates", caption: "Hey Mac checks about once a day and asks before installing.") {
+                        Button("Check Now") { AppUpdater.shared.checkNow() }
+                            .buttonStyle(PillButtonStyle(kind: .secondary))
+                            .disabled(!AppUpdater.shared.canCheck)
+                    }
+                    RowDivider()
+                    switchRow("Check automatically",
+                              isOn: Binding(get: { AppUpdater.shared.checksAutomatically },
+                                            set: { AppUpdater.shared.setChecksAutomatically($0) }))
+                }
+            }
+        }
+
         PaneSection(header: "Open-source components",
                     footnote: "Both models run on this Mac. Nothing is ever uploaded.") {
             SettingsCard {

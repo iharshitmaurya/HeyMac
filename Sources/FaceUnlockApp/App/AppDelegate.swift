@@ -12,6 +12,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        // Sparkle quits the app to swap in the new version; that quit must not be vetoed.
+        if AppUpdater.shared.isInstalling { return .terminateNow }
         let controller = AppLockController.shared
         guard controller.protectsQuit, !controller.quitAuthorized else { return .terminateNow }
         guard !quitPromptActive else { return .terminateCancel } // one auth chain at a time

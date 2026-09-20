@@ -7,6 +7,9 @@ let package = Package(
     products: [
         .executable(name: "HeyMac", targets: ["FaceUnlockApp"]),
     ],
+    dependencies: [
+        .package(url: "https://github.com/sparkle-project/Sparkle", from: "2.6.0"),
+    ],
     targets: [
         .target(
             name: "FaceUnlockCore",
@@ -22,9 +25,14 @@ let package = Package(
         ),
         .executableTarget(
             name: "FaceUnlockApp",
-            dependencies: ["FaceUnlockCore", "FaceUnlockEngine"],
+            dependencies: [
+                "FaceUnlockCore", "FaceUnlockEngine",
+                .product(name: "Sparkle", package: "Sparkle"),
+            ],
             exclude: ["Animations"],
-            swiftSettings: [.swiftLanguageMode(.v5)]
+            swiftSettings: [.swiftLanguageMode(.v5)],
+            // Sparkle.framework is embedded in Contents/Frameworks by scripts/build-app.sh.
+            linkerSettings: [.unsafeFlags(["-Xlinker", "-rpath", "-Xlinker", "@executable_path/../Frameworks"])]
         ),
         .testTarget(
             name: "FaceUnlockCoreTests",

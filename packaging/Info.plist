@@ -22,6 +22,12 @@
 	<string>14.0</string>
 	<key>LSUIElement</key>
 	<true/>
+	<key>SUFeedURL</key>
+	<string>https://github.com/iharshitmaurya/HeyMac/releases/latest/download/appcast.xml</string>
+	<key>SUPublicEDKey</key>
+	<string>0w5Lm33NoVePIpJVgH8Wl3nX+kniFhj7Gv4Robk7+o0=</string>
+	<key>SUEnableAutomaticChecks</key>
+	<true/>
 	<key>NSCameraUsageDescription</key>
 	<string>Hey Mac uses the camera to recognize your face for lock-screen unlock and App Lock. Images never leave this Mac.</string>
 	<key>NSHumanReadableCopyright</key>

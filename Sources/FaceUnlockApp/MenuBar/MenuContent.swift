@@ -46,6 +46,10 @@ struct MenuContent: View {
                 actionRow("Set Up Hey Mac…", icon: "person.crop.circle.badge.plus", shortcut: nil) { model.openSetup() }
             }
             actionRow("Settings…", icon: "gearshape", shortcut: "⌘,") { model.openSettings() }
+            if AppUpdater.shared.isAvailable {
+                actionRow("Check for Updates…", icon: "arrow.down.circle", shortcut: nil) { AppUpdater.shared.checkNow() }
+                    .disabled(!AppUpdater.shared.canCheck)
+            }
             divider
             actionRow("Quit Hey Mac", icon: "rectangle.portrait.and.arrow.right", shortcut: "⌘Q", iconTint: Theme.badText) { NSApplication.shared.terminate(nil) }
         }

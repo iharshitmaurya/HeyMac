@@ -19,3 +19,14 @@ sign_code() {
             -r="designated => identifier \"$identifier\"" "$path"
     fi
 }
+
+# sign_nested PATH: signs a bundled third-party binary (Sparkle's helpers) with the same
+# identity, keeping its own identifier. Call inside-out, before signing the app.
+sign_nested() {
+    local path="$1"
+    if signing_identity_available; then
+        codesign --force --sign "$SIGNING_IDENTITY_NAME" --timestamp=none "$path"
+    else
+        codesign --force --sign - "$path"
+    fi
+}

@@ -22,6 +22,11 @@ cp "$BIN/HeyMac" "$APP/Contents/MacOS/HeyMac"
 # SwiftPM's resource bundle holds the Core ML models; the app looks for it here.
 cp -R "$BIN/FaceUnlockDaemon_FaceUnlockCore.bundle" "$APP/Contents/Resources/"
 cp -R "$REPO_ROOT/Sources/FaceUnlockApp/Animations" "$APP/Contents/Resources/Animations"
+# Sparkle (the updater) is a framework the executable loads from Contents/Frameworks.
+SPARKLE="$(find "$REPO_ROOT/.build/artifacts/sparkle" -type d -name Sparkle.framework -path '*macos-arm64_x86_64*' | head -1)"
+[ -d "$SPARKLE" ] || { echo "Sparkle.framework not found; run swift build first" >&2; exit 1; }
+mkdir -p "$APP/Contents/Frameworks"
+cp -R "$SPARKLE" "$APP/Contents/Frameworks/"
 mkdir -p "$APP/Contents/Library/LaunchAgents"
 cp "$PACKAGING/com.faceunlock.app.agent.plist" "$APP/Contents/Library/LaunchAgents/"
 # One-time cleanup of the sudo hook that older versions installed (run by the app on first launch).
@@ -40,6 +45,12 @@ else
 fi
 
 echo "Signing..."
+# Inside-out: Sparkle's helpers, then the framework, then the app.
+SPK="$APP/Contents/Frameworks/Sparkle.framework/Versions/B"
+for nested in "$SPK/XPCServices/Installer.xpc" "$SPK/XPCServices/Downloader.xpc" "$SPK/Autoupdate" "$SPK/Updater.app"; do
+    [ -e "$nested" ] && sign_nested "$nested"
+done
+sign_nested "$APP/Contents/Frameworks/Sparkle.framework"
 sign_code "$APP" com.faceunlock.app
 codesign --verify --deep --strict "$APP"
 if ! signing_identity_available; then

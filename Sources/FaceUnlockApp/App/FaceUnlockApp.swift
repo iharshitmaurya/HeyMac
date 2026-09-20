@@ -35,6 +35,7 @@ struct FaceUnlockApp: App {
             exit(1)
         }
         model = AppModel.shared
+        AppUpdater.shared.start()
     }
 
     var body: some Scene {
