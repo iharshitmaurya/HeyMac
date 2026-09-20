@@ -55,10 +55,6 @@ final class AppModel {
             return
         }
 
-        if LegacyAgentMigration.migrateIfNeeded() {
-            log.write("removed the old faceunlockd LaunchAgent (the app replaces it)")
-        }
-        removeLegacySudoHookOnce()
         do {
             runtime = try HeyMacRuntime()
         } catch {
@@ -82,30 +78,6 @@ final class AppModel {
         }
         if !setupComplete {
             DispatchQueue.main.async { [self] in openSetup() }
-        }
-    }
-
-    // MARK: - Legacy sudo hook
-
-    /// Sudo face unlock no longer exists; older versions left a PAM hook in /etc/pam.d. Offer to
-    /// remove it once (the flag is set first so a cancelled admin prompt never nags again).
-    private func removeLegacySudoHookOnce() {
-        let flag = "legacySudoCleanupAttempted"
-        guard !UserDefaults.standard.bool(forKey: flag) else { return }
-        let resources = Bundle.main.resourceURL ?? Bundle.main.bundleURL
-        let cleanup = LegacySudoCleanup(scriptURL: resources.appendingPathComponent("uninstall-sudo-hook.sh"))
-        guard cleanup.leftoverDetected() else { return }
-        UserDefaults.standard.set(true, forKey: flag)
-        let log = self.log
-        DispatchQueue.global(qos: .utility).async {
-            do {
-                try cleanup.remove()
-                log.write("removed the old sudo face-unlock hook")
-            } catch LegacySudoCleanupError.cancelled {
-                log.write("old sudo face-unlock hook left in place (administrator prompt cancelled)")
-            } catch {
-                log.write("could not remove the old sudo face-unlock hook: \(error)")
-            }
         }
     }
 

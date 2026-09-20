@@ -24,15 +24,6 @@ public enum SelfCheck {
             problems.append("anti-spoof model failed to load: \(error)")
         }
 
-        if Bundle.main.bundleURL.pathExtension == "app" {
-            let resources = Bundle.main.resourceURL ?? Bundle.main.bundleURL
-            for name in ["uninstall-sudo-hook.sh"] {
-                if !FileManager.default.fileExists(atPath: resources.appendingPathComponent(name).path) {
-                    problems.append("missing bundled resource: \(name)")
-                }
-            }
-        }
-
         return problems
     }
 

@@ -452,15 +452,6 @@ private struct AboutPane: View {
                 }
             }
         }
-
-        PaneSection(header: "Open-source components",
-                    footnote: "Both models run on this Mac. Nothing is ever uploaded.") {
-            SettingsCard {
-                FormRow(title: "Face embedding", caption: "ArcFace (w600k_mbf)") { license("MIT") }
-                RowDivider()
-                FormRow(title: "Liveness", caption: "MiniFASNetV2, from minivision-ai/Silent-Face-Anti-Spoofing") { license("Apache-2.0") }
-            }
-        }
     }
 
     /// Cancel is the default (Return) button; the destructive confirm is second and never the default.
@@ -477,9 +468,6 @@ private struct AboutPane: View {
         }
     }
 
-    private func license(_ text: String) -> some View {
-        Text(text).font(Typography.mono).foregroundStyle(.secondary).lineLimit(1)
-    }
 }
 
 

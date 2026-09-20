@@ -6,7 +6,6 @@ private enum WZ {
     static let win = Color(light: 0xF5F5F7, dark: 0x1E1E20)
     static let card = Color(light: 0xFFFFFF, dark: 0x2A2A2D)
     static let ctl = Color(light: 0xFFFFFF, dark: 0x3A3A3E)
-    static let neu = Color(light: 0xE8E8ED, dark: 0x3A3A3E)
     static let text2 = Color(light: 0x5F5F66, dark: 0xA9A9B1)
     static let accent = Color(light: 0x0071E3, dark: 0x0A6FDC)
     static let accentPressed = Color(light: 0x0857AD, dark: 0x0B5FBF)

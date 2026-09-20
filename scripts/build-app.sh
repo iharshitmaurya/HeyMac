@@ -30,8 +30,6 @@ mkdir -p "$APP/Contents/Frameworks"
 cp -R "$SPARKLE" "$APP/Contents/Frameworks/"
 mkdir -p "$APP/Contents/Library/LaunchAgents"
 cp "$PACKAGING/com.heymac.app.agent.plist" "$APP/Contents/Library/LaunchAgents/"
-# One-time cleanup of the sudo hook that older versions installed (run by the app on first launch).
-cp "$PACKAGING/uninstall-sudo-hook.sh" "$APP/Contents/Resources/"
 cp "$REPO_ROOT/THIRD_PARTY_NOTICES.md" "$APP/Contents/Resources/"
 sed "s/__VERSION__/$VERSION/g" "$PACKAGING/Info.plist" > "$APP/Contents/Info.plist"
 

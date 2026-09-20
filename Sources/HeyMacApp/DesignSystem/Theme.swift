@@ -29,7 +29,6 @@ enum Spacing {
     static let md: CGFloat = 12
     static let lg: CGFloat = 16
     static let xl: CGFloat = 24
-    static let xxl: CGFloat = 32
 }
 
 enum Radius {
@@ -44,7 +43,6 @@ enum IconSize {
     static let glyph: CGFloat = 12
     static let tile: CGFloat = 22
     static let app: CGFloat = 26
-    static let avatar: CGFloat = 40
 }
 
 /// Mirrors what the views use today (13 semibold rows, 11.5 secondary captions, 15.5 bold titles).
@@ -149,15 +147,6 @@ struct StatusChip: View {
             case .good: return Theme.good
             case .warn: return Theme.warn
             case .bad: return Theme.bad
-            case .idle: return .secondary
-            }
-        }
-        /// Adaptive AA text variant of `color`.
-        var textColor: Color {
-            switch self {
-            case .good: return Theme.goodText
-            case .warn: return Theme.warnText
-            case .bad: return Theme.badText
             case .idle: return .secondary
             }
         }

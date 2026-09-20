@@ -31,6 +31,6 @@
 	<key>NSCameraUsageDescription</key>
 	<string>Hey Mac uses the camera to recognize your face for lock-screen unlock and App Lock. Images never leave this Mac.</string>
 	<key>NSHumanReadableCopyright</key>
-	<string>Face unlock for Apple Silicon Macs. Models: ArcFace (MIT) and MiniFASNetV2 (Apache-2.0).</string>
+	<string>Copyright © 2026 Harshit Maurya. MIT License.</string>
 </dict>
 </plist>

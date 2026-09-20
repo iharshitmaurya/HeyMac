@@ -14,7 +14,6 @@ for path in \
     Contents/Resources/Animations/unlockstatic.png \
     Contents/Resources/Animations/unlockanimation.mp4 \
     Contents/Resources/Animations/unsuccessfulunlockanimation.mp4 \
-    Contents/Resources/uninstall-sudo-hook.sh \
     Contents/Resources/THIRD_PARTY_NOTICES.md \
     Contents/Frameworks/Sparkle.framework \
     Contents/Library/LaunchAgents/com.heymac.app.agent.plist
@@ -26,7 +25,6 @@ codesign --verify --deep --strict "$APP" || fail "signature does not verify"
 [ "$(/usr/libexec/PlistBuddy -c 'Print :LSUIElement' "$APP/Contents/Info.plist")" = "true" ] || fail "LSUIElement is not set (the app would show a Dock icon)"
 /usr/libexec/PlistBuddy -c 'Print :NSCameraUsageDescription' "$APP/Contents/Info.plist" >/dev/null || fail "no camera usage description"
 
-bash -n "$APP/Contents/Resources/uninstall-sudo-hook.sh" || fail "uninstall-sudo-hook.sh is not valid shell"
 
 "$APP/Contents/MacOS/HeyMac" --self-check || fail "self-check failed"
 
