@@ -8,3 +8,10 @@ dist/
 MEMORY.md
 THIRD_PARTY.md
 docs/
+
+.agents/
+.claude/
+my-asset/
+brag-output*/
+skills-lock.json
+.brag_d*
