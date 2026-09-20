@@ -33,15 +33,16 @@ cp "$PACKAGING/com.heymac.app.agent.plist" "$APP/Contents/Library/LaunchAgents/"
 cp "$REPO_ROOT/THIRD_PARTY_NOTICES.md" "$APP/Contents/Resources/"
 sed "s/__VERSION__/$VERSION/g" "$PACKAGING/Info.plist" > "$APP/Contents/Info.plist"
 
-echo "Drawing the app icon..."
+echo "Building the app icon..."
 ICONSET="$DIST/AppIcon.iconset"
 rm -rf "$ICONSET"
-if swift "$PACKAGING/make-icon.swift" "$ICONSET" 2>/dev/null; then
-    iconutil -c icns "$ICONSET" -o "$APP/Contents/Resources/AppIcon.icns"
-    rm -rf "$ICONSET"
-else
-    echo "warning: could not draw the icon; shipping without one" >&2
-fi
+mkdir -p "$ICONSET"
+for size in 16 32 128 256 512; do
+    sips -z $size $size "$PACKAGING/AppIcon.png" --out "$ICONSET/icon_${size}x${size}.png" >/dev/null
+    sips -z $((size * 2)) $((size * 2)) "$PACKAGING/AppIcon.png" --out "$ICONSET/icon_${size}x${size}@2x.png" >/dev/null
+done
+iconutil -c icns "$ICONSET" -o "$APP/Contents/Resources/AppIcon.icns"
+rm -rf "$ICONSET"
 
 echo "Signing..."
 # Inside-out: Sparkle's helpers, then the framework, then the app.
