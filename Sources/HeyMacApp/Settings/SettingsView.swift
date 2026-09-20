@@ -423,6 +423,16 @@ private struct AboutPane: View {
             }
         }
 
+        PaneSection(header: "Uninstall") {
+            SettingsCard {
+                FormRow(title: "Uninstall Hey Mac",
+                        caption: "Removes the app, your face data, saved password and settings from this Mac.") {
+                    Button("Uninstall…") { confirmUninstall() }
+                        .buttonStyle(PillButtonStyle(kind: .danger))
+                }
+            }
+        }
+
         PaneSection(header: "Open-source components",
                     footnote: "Both models run on this Mac. Nothing is ever uploaded.") {
             SettingsCard {
@@ -430,6 +440,20 @@ private struct AboutPane: View {
                 RowDivider()
                 FormRow(title: "Liveness", caption: "MiniFASNetV2, from minivision-ai/Silent-Face-Anti-Spoofing") { license("Apache-2.0") }
             }
+        }
+    }
+
+    /// Cancel is the default (Return) button; the destructive confirm is second and never the default.
+    private func confirmUninstall() {
+        let alert = NSAlert()
+        alert.messageText = "Uninstall Hey Mac?"
+        alert.informativeText = "This deletes your enrolled face, the stored login password, the encryption key, your settings and the app itself, and turns off lock-screen unlock and App Lock. It can't be undone."
+        alert.alertStyle = .warning
+        alert.addButton(withTitle: "Cancel")
+        let remove = alert.addButton(withTitle: "Uninstall")
+        remove.hasDestructiveAction = true
+        if alert.runModal() == .alertSecondButtonReturn {
+            Task { await model.uninstall() }
         }
     }
 

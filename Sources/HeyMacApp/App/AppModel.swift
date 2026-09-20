@@ -342,6 +342,42 @@ final class AppModel {
         openSetup()
     }
 
+    /// Removes everything Hey Mac put on this Mac (face data, password, Keychain key, settings, log, login
+    /// item and relaunch agent), moves the app to the Trash and quits. Asks App Lock to authorize first, so
+    /// this can't be used to get around it. Returns without doing anything if that is refused.
+    func uninstall() async {
+        let lock = AppLockController.shared
+        if lock.protectsQuit {
+            guard await lock.authorize(reason: "Uninstall Hey Mac") else { return }
+        }
+
+        windows.close(id: "settings")
+        lock.store.enabled = false
+        lock.stop()
+        stopEngine()
+        AppLockAgent.unregister()
+        if SMAppService.mainApp.status == .enabled { try? await SMAppService.mainApp.unregister() }
+
+        try? runtime?.removeAllData()
+        try? FileManager.default.removeItem(at: HeyMacRuntime.defaultSupportDirectory)
+        try? FileManager.default.removeItem(at: AppLog.shared.url)
+        if let bundleID = Bundle.main.bundleIdentifier {
+            UserDefaults.standard.removePersistentDomain(forName: bundleID)
+            CFPreferencesAppSynchronize(kCFPreferencesCurrentApplication)
+        }
+
+        // Only a real .app (never the bare debug binary's build folder).
+        let bundle = Bundle.main.bundleURL
+        let trashed = bundle.pathExtension == "app" && (try? FileManager.default.trashItem(at: bundle, resultingItemURL: nil)) != nil
+        if !trashed && bundle.pathExtension == "app" {
+            let alert = NSAlert()
+            alert.messageText = "Hey Mac's data is removed"
+            alert.informativeText = "It couldn't move itself to the Trash. Drag Hey Mac from Applications to the Trash to finish."
+            alert.runModal()
+        }
+        exit(0) // no orderly quit: nothing may write settings back after they were deleted
+    }
+
     func finishSetup() {
         settings.setupComplete = true
         reloadSettings()

@@ -24,6 +24,11 @@ struct HeyMacApp: App {
             let dir = CommandLine.arguments[flag + 1]
             MainActor.assumeIsolated { UISnapshot.run(outputDir: dir) }
         }
+        // A copy sitting in the Trash (the launch agent can still point at it) must not come back to life.
+        if Bundle.main.bundleURL.path.contains("/.Trash/") {
+            AppLockAgent.unregister()
+            exit(0)
+        }
         // The launch agent and the login item can both start us; only one copy may run, and the
         // lowest pid keeps running so two simultaneous starts can never both yield. A duplicate
         // exits NON-zero: launchd only restarts a KeepAlive/SuccessfulExit=false job on failure, so

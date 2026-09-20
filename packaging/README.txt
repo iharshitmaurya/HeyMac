@@ -16,5 +16,6 @@ GOOD TO KNOW
 - A photo or a face on a screen is rejected by the liveness check.
 
 UNINSTALL
-Menu bar icon > Settings… > Remove My Face Data, then quit Hey Mac and drag it to
-the Trash.
+Menu bar icon > Settings… > About > Uninstall…. That removes the app, your face
+data, saved password and settings, and moves Hey Mac to the Trash. (Dragging it to
+the Trash yourself leaves your face data and settings on this Mac.)
