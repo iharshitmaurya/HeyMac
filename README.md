@@ -14,6 +14,10 @@ Unlock your Mac's lock screen and secure individual apps with a single look.
 ![Swift](https://img.shields.io/badge/Swift-Native-F05138?style=for-the-badge&logo=swift&logoColor=white)
 ![Privacy](https://img.shields.io/badge/100%25-On--Device-34C759?style=for-the-badge&logo=shield&logoColor=white)
 
+<a href="https://github.com/iharshitmaurya/HeyMac/releases/latest">
+  <img src="https://img.shields.io/badge/⬇%20Install%20Hey%20Mac-0071E3?style=for-the-badge&logo=apple&logoColor=white" alt="Install Hey Mac"/>
+</a>
+
 [**Download Latest Release**](https://github.com/iharshitmaurya/HeyMac/releases/latest) &nbsp;&nbsp;•&nbsp;&nbsp; [Build Instructions](#-build-from-source) &nbsp;&nbsp;•&nbsp;&nbsp; [Architecture](#-how-it-works)
 
 </div>
