@@ -37,6 +37,8 @@ Hey Mac bridges the gap between iOS-level convenience and macOS security, bringi
 
 ### Download
 
+> ⚠️  **IMPORTANT:** If macOS blocks Hey Mac, go to **System Settings → Privacy & Security → Open Anyway**.
+
 Download the latest `.dmg` and drag **Hey Mac** into your Applications folder.
 
 <a href="https://github.com/iharshitmaurya/HeyMac/releases/latest/download/HeyMac.dmg">
@@ -48,9 +50,6 @@ Download the latest `.dmg` and drag **Hey Mac** into your Applications folder.
 ```bash
 brew install --cask iharshitmaurya/tap/heymac
 ```
-
-> Hey Mac is currently not notarized. If macOS blocks the app, go to **System Settings → Privacy & Security → Open Anyway**.
-
 ---
 
 ## 🔒 Private & Secure by Design
