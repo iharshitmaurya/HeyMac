@@ -33,7 +33,7 @@ public final class CameraCapture: NSObject, FrameSource, AVCaptureVideoDataOutpu
     private var latest: (image: CGImage, sequence: Int)?
     private var sequence = 0
 
-    public init(warmup: TimeInterval = 0.8) {
+    public init(warmup: TimeInterval = 0.4) {
         self.warmup = warmup
     }
 

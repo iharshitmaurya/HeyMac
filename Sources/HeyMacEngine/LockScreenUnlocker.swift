@@ -40,7 +40,6 @@ public struct LockScreenEnvironment {
                 task.executableURL = URL(fileURLWithPath: "/usr/bin/caffeinate")
                 task.arguments = ["-u", "-t", "1"]
                 try? task.run()
-                task.waitUntilExit()
             },
             sleep: { Thread.sleep(forTimeInterval: $0) }
         )
@@ -65,7 +64,7 @@ public enum LockScreenTick: Equatable {
 public final class LockScreenUnlocker: @unchecked Sendable {
     static let unlockConfirmationDelay: TimeInterval = 5
     static let unlockPollInterval: TimeInterval = 0.15
-    static let pollInterval: TimeInterval = 1
+    static let pollInterval: TimeInterval = 0.25
 
     private let matcher: FaceMatching
     private let typist: PasswordTyping
