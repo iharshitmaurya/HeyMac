@@ -6,22 +6,26 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PACKAGING="$(dirname "$SCRIPT_DIR")/packaging"
 REPO_ROOT="$(dirname "$SCRIPT_DIR")"
-VERSION="${1:-1.0.0}"
+VERSION="${1:-1.0.4}"
 DIST="$REPO_ROOT/dist"
 APP="$DIST/HeyMac.app"
 source "$SCRIPT_DIR/lib-signing.sh"
 
-echo "Building executables (release)..."
-(cd "$REPO_ROOT" && swift build -c release --product HeyMac)
-BIN="$(cd "$REPO_ROOT" && swift build -c release --show-bin-path)"
+echo "Building universal executables (release)..."
+ARM64_TRIPLE="arm64-apple-macosx14.0"
+X86_64_TRIPLE="x86_64-apple-macosx14.0"
+(cd "$REPO_ROOT" && swift build -c release --triple "$ARM64_TRIPLE" --product HeyMac)
+(cd "$REPO_ROOT" && swift build -c release --triple "$X86_64_TRIPLE" --product HeyMac)
+ARM64_BIN="$(cd "$REPO_ROOT" && swift build -c release --triple "$ARM64_TRIPLE" --show-bin-path)"
+X86_64_BIN="$(cd "$REPO_ROOT" && swift build -c release --triple "$X86_64_TRIPLE" --show-bin-path)"
 
 echo "Assembling $APP..."
 mkdir -p "$DIST" && touch "$DIST/.metadata_never_index"  # keeps Spotlight from listing this build copy as an installed app
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
-cp "$BIN/HeyMac" "$APP/Contents/MacOS/HeyMac"
+lipo -create "$ARM64_BIN/HeyMac" "$X86_64_BIN/HeyMac" -output "$APP/Contents/MacOS/HeyMac"
 # SwiftPM's resource bundle holds the Core ML models; the app looks for it here.
-cp -R "$BIN/HeyMac_HeyMacCore.bundle" "$APP/Contents/Resources/"
+cp -R "$ARM64_BIN/HeyMac_HeyMacCore.bundle" "$APP/Contents/Resources/"
 cp -R "$REPO_ROOT/Sources/HeyMacApp/Animations" "$APP/Contents/Resources/Animations"
 # Sparkle (the updater) is a framework the executable loads from Contents/Frameworks.
 SPARKLE="$(find "$REPO_ROOT/.build/artifacts/sparkle" -type d -name Sparkle.framework -path '*macos-arm64_x86_64*' | head -1)"

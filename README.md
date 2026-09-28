@@ -9,8 +9,8 @@ Unlock your Mac's lock screen and secure individual apps with a single look.
 
 <br>
 
-![macOS](https://img.shields.io/badge/macOS-14.0%2B-black?style=for-the-badge&logo=apple&logoColor=white)
-![Apple Silicon](https://img.shields.io/badge/Apple%20Silicon-Native-0071E3?style=for-the-badge&logo=apple&logoColor=white)
+![macOS](https://img.shields.io/badge/macOS%20Sonoma-14.0%2B-black?style=for-the-badge&logo=apple&logoColor=white)
+![Universal](https://img.shields.io/badge/Intel%20%2B%20Apple%20Silicon-Universal-0071E3?style=for-the-badge&logo=apple&logoColor=white)
 ![Privacy](https://img.shields.io/badge/100%25-On--Device-34C759?style=for-the-badge&logo=shield&logoColor=white)
 ![Views](https://komarev.com/ghpvc/?username=iharshitmaurya&repo=HeyMac&label=Views&color=0071E3&style=for-the-badge)
 
@@ -56,7 +56,7 @@ brew install --cask iharshitmaurya/tap/heymac
 
 Security is not an afterthought; it is the foundation of Hey Mac. This application operates on a strict zero-trust, local-only model.
 
-> **100% On-Device Processing:** All facial recognition is handled locally by the Apple Neural Engine via Core ML. **No data ever leaves your machine.**
+> **100% On-Device Processing:** All facial recognition runs locally through Core ML, using the compute hardware available on your Mac. **No data ever leaves your machine.**
 
 *   **Zero Photo Storage:** Hey Mac does not save images of your face. It generates a mathematical, numeric embedding of your facial structure, encrypted securely within the native **macOS Keychain**.
 *   **Advanced Anti-Spoofing:** Built-in liveness detection ensures a physical, three-dimensional human is present. It actively rejects photographs, screens, or printed masks.
