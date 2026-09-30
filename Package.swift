@@ -1,4 +1,4 @@
-// swift-tools-version:6.0
+// swift-tools-version:5.9
 import PackageDescription
 
 let package = Package(
@@ -20,8 +20,7 @@ let package = Package(
         ),
         .target(
             name: "HeyMacEngine",
-            dependencies: ["HeyMacCore"],
-            swiftSettings: [.swiftLanguageMode(.v5)]
+            dependencies: ["HeyMacCore"]
         ),
         .executableTarget(
             name: "HeyMacApp",
@@ -30,7 +29,6 @@ let package = Package(
                 .product(name: "Sparkle", package: "Sparkle"),
             ],
             exclude: ["Animations"],
-            swiftSettings: [.swiftLanguageMode(.v5)],
             // Sparkle.framework is embedded in Contents/Frameworks by scripts/build-app.sh.
             linkerSettings: [.unsafeFlags(["-Xlinker", "-rpath", "-Xlinker", "@executable_path/../Frameworks"])]
         ),
@@ -41,8 +39,7 @@ let package = Package(
         ),
         .testTarget(
             name: "HeyMacEngineTests",
-            dependencies: ["HeyMacEngine", "HeyMacCore"],
-            swiftSettings: [.swiftLanguageMode(.v5)]
+            dependencies: ["HeyMacEngine", "HeyMacCore"]
         ),
     ]
 )

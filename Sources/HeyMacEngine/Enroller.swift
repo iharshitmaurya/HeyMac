@@ -13,6 +13,8 @@ extension VerificationPipeline: EnrollmentSampling {}
 public enum EnrollmentProgress: Equatable, Sendable {
     case sampleCaptured(count: Int, target: Int, liveness: Float)
     case rejectedNotLive(confidence: Float)
+    case noFaceDetected
+    case frameRejected(String)
     case finished(minAgreement: Float, meanAgreement: Float)
     case failed(String)
 }
@@ -65,6 +67,12 @@ public final class Enroller {
         var lastSequence = 0
         var lastSampleAt = Date.distantPast
         var lastLivenessReport = Date.distantPast
+        var lastAnalysisReport = Date.distantPast
+        var noFaceFrames = 0
+        var livenessRejectedFrames = 0
+        var bestLiveness: Float = 0
+        var analysisFailures = 0
+        var lastAnalysisFailure: String?
         let deadline = clock().addingTimeInterval(timeout)
 
         while samples.count < target {
@@ -74,7 +82,17 @@ public final class Enroller {
             }
             let now = clock()
             guard now < deadline else {
-                onProgress(.failed("Captured \(samples.count) of \(target) samples in \(Int(timeout))s. Check the lighting, keep your face centered, and try again."))
+                let reason: String
+                if livenessRejectedFrames > 0 {
+                    reason = String(format: "Found a face, but liveness was not confirmed (best confidence %.2f). Face the camera in bright, even light and try again.", bestLiveness)
+                } else if noFaceFrames > 0 {
+                    reason = "Could not find a usable face in the camera frames. Center your face, keep both eyes visible, and improve the lighting."
+                } else if analysisFailures > 0 {
+                    reason = "Face analysis failed: \(lastAnalysisFailure ?? "unknown error")"
+                } else {
+                    reason = "No camera frames arrived. Check camera access and try again."
+                }
+                onProgress(.failed("Captured \(samples.count) of \(target) samples in \(Int(timeout))s. \(reason)"))
                 return false
             }
             guard now.timeIntervalSince(lastSampleAt) >= sampleSpacing, let frame = frames.frame(newerThan: lastSequence) else {
@@ -88,12 +106,27 @@ public final class Enroller {
                 lastSampleAt = now
                 onProgress(.sampleCaptured(count: samples.count, target: target, liveness: sample.liveness.confidence))
             } catch VerificationPipelineError.notLive(let confidence) {
+                livenessRejectedFrames += 1
+                bestLiveness = max(bestLiveness, confidence)
                 if now.timeIntervalSince(lastLivenessReport) >= 2 {
                     lastLivenessReport = now
                     onProgress(.rejectedNotLive(confidence: confidence))
                 }
                 sleep(0.03)
+            } catch FaceEmbedderError.noFaceDetected {
+                noFaceFrames += 1
+                if now.timeIntervalSince(lastAnalysisReport) >= 2 {
+                    lastAnalysisReport = now
+                    onProgress(.noFaceDetected)
+                }
+                sleep(0.03)
             } catch {
+                analysisFailures += 1
+                lastAnalysisFailure = String(describing: error)
+                if now.timeIntervalSince(lastAnalysisReport) >= 2 {
+                    lastAnalysisReport = now
+                    onProgress(.frameRejected(lastAnalysisFailure ?? "unknown error"))
+                }
                 sleep(0.03)
             }
         }

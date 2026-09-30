@@ -10,7 +10,7 @@ Unlock your Mac's lock screen and secure individual apps with a single look.
 <br>
 
 ![macOS](https://img.shields.io/badge/macOS%20Sonoma-14.0%2B-black?style=for-the-badge&logo=apple&logoColor=white)
-![Universal](https://img.shields.io/badge/Intel%20%2B%20Apple%20Silicon-Universal-0071E3?style=for-the-badge&logo=apple&logoColor=white)
+![Intel and Apple Silicon](https://img.shields.io/badge/Intel%20%2B%20Apple%20Silicon-Supported-0071E3?style=for-the-badge&logo=apple&logoColor=white)
 ![Privacy](https://img.shields.io/badge/100%25-On--Device-34C759?style=for-the-badge&logo=shield&logoColor=white)
 ![Views](https://komarev.com/ghpvc/?username=iharshitmaurya&repo=HeyMac&label=Views&color=0071E3&style=for-the-badge)
 

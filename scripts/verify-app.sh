@@ -8,7 +8,12 @@ fail() { echo "FAIL: $*" >&2; exit 1; }
 
 [ -d "$APP" ] || fail "no app at $APP"
 [ "$(/usr/libexec/PlistBuddy -c 'Print :LSMinimumSystemVersion' "$APP/Contents/Info.plist")" = "14.0" ] || fail "minimum system version is not macOS 14 (Sonoma)"
-lipo -verify_arch arm64 x86_64 "$APP/Contents/MacOS/HeyMac" || fail "executable is not universal (arm64 and x86_64)"
+EXPECTED_ARCH="${HEYMAC_EXPECTED_ARCH:-$(uname -m)}"
+case "$EXPECTED_ARCH" in
+    arm64|x86_64) ;;
+    *) fail "unsupported expected architecture: $EXPECTED_ARCH" ;;
+esac
+lipo "$APP/Contents/MacOS/HeyMac" -verify_arch "$EXPECTED_ARCH" || fail "executable does not contain the $EXPECTED_ARCH architecture"
 for path in \
     Contents/MacOS/HeyMac \
     Contents/Info.plist \

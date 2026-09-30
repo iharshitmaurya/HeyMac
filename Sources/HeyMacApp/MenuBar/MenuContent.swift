@@ -126,7 +126,12 @@ struct MenuContent: View {
             .frame(width: Self.iconCol, alignment: .center)
     }
 
-    private func toggleRow(_ label: String, icon: String, isOn: Bool, action: @escaping (Bool) -> Void) -> some View {
+    private func toggleRow(
+        _ label: String,
+        icon: String,
+        isOn: Bool,
+        action: @escaping @MainActor @Sendable (Bool) -> Void
+    ) -> some View {
         HoverRow(id: label) {
             HStack(spacing: Spacing.md) {
                 iconView(icon)

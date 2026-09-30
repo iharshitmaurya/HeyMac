@@ -19,6 +19,9 @@ final class SetupFlow {
     /// The step the window opened on; Back never goes before it (the Test window opens mid-flow).
     let startStep: Step
     private var advanceTask: Task<Void, Never>?
+    private let previewCameraQueue = DispatchQueue(label: "heymac.setup.preview-camera")
+    private var previewGeneration = 0
+    private var previewCameraAcquired = false
 
     var cameraAuthorized = false
     var cameraDenied = false
@@ -86,6 +89,8 @@ final class SetupFlow {
 
     func startPreview() {
         guard previewTimer == nil, let runtime = model.runtime else { return }
+        previewGeneration += 1
+        let generation = previewGeneration
         previewTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { _ in
             Task { @MainActor in
                 guard let frame = runtime.camera.frame(newerThan: self.previewSequence) else { return }
@@ -93,12 +98,39 @@ final class SetupFlow {
                 self.preview = frame.image
             }
         }
+        previewCameraQueue.async { [weak self] in
+            do {
+                try runtime.camera.start()
+                DispatchQueue.main.async { [weak self] in
+                    guard let self, self.previewGeneration == generation, self.previewTimer != nil else {
+                        runtime.camera.stop()
+                        return
+                    }
+                    self.previewCameraAcquired = true
+                }
+            } catch {
+                DispatchQueue.main.async { [weak self] in
+                    guard let self, self.previewGeneration == generation else { return }
+                    let message = "Camera unavailable: \(error)"
+                    if self.step == .test {
+                        self.testMessage = message
+                    } else {
+                        self.enrollHint = message
+                        self.enrollHintTone = .warn
+                    }
+                }
+            }
+        }
     }
 
     func stopPreview() {
+        previewGeneration += 1
         previewTimer?.invalidate()
         previewTimer = nil
         preview = nil
+        guard previewCameraAcquired, let camera = model.runtime?.camera else { return }
+        previewCameraAcquired = false
+        previewCameraQueue.async { camera.stop() }
     }
 
     // MARK: - Enrollment
@@ -128,8 +160,14 @@ final class SetupFlow {
             sampleTarget = target
             enrollHint = "Keep looking at the camera…"
             enrollHintTone = .neutral
-        case .rejectedNotLive:
-            enrollHint = "Make sure it's your real face, well lit — photos and screens are rejected."
+        case .rejectedNotLive(let confidence):
+            enrollHint = String(format: "Face found, but liveness confidence is low (%.2f). Face the camera in even light.", confidence)
+            enrollHintTone = .warn
+        case .noFaceDetected:
+            enrollHint = "No face detected. Center your face in the camera and look toward it."
+            enrollHintTone = .warn
+        case .frameRejected(let reason):
+            enrollHint = "Face analysis failed: \(reason)"
             enrollHintTone = .warn
         case .finished(let minAgreement, _):
             enrollFinished = true

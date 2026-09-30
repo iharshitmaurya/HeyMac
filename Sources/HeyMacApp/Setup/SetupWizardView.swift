@@ -1,4 +1,5 @@
 import SwiftUI
+import Observation
 import HeyMacEngine
 
 /// Palette of the wizard design (light / dark).
@@ -60,7 +61,7 @@ private struct WizardButtonStyle: ButtonStyle {
 }
 
 struct SetupWizardView: View {
-    let flow: SetupFlow
+    @Bindable var flow: SetupFlow
 
     private static let stepCount = SetupFlow.Step.allCases.count
 
@@ -421,8 +422,6 @@ struct SetupWizardView: View {
         }
     }
 
-    private var lockScreenOn: Bool { flow.model.lockScreenEnabled || flow.lockScreenWanted }
-
     private var lockScreenRow: some View {
         VStack(spacing: 0) {
             HStack(spacing: 12) {
@@ -434,19 +433,17 @@ struct SetupWizardView: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer(minLength: 8)
-                Toggle("Unlock the lock screen", isOn: Binding(
-                    get: { lockScreenOn },
-                    set: { flow.setLockScreenWanted($0) }
-                ))
+                Toggle("Unlock the lock screen", isOn: $flow.lockScreenWanted)
                 .toggleStyle(.switch).labelsHidden().tint(WZ.accent)
+                .onChange(of: flow.lockScreenWanted) { _, wanted in flow.setLockScreenWanted(wanted) }
             }
             .padding(.horizontal, 16).padding(.vertical, 10).frame(minHeight: 48)
 
             if flow.lockScreenWanted && !flow.model.lockScreenEnabled {
                 VStack(alignment: .leading, spacing: 8) {
                     HStack(alignment: .top, spacing: 12) {
-                        passwordField("Login password", text: Binding(get: { flow.password }, set: { flow.password = $0 }))
-                        passwordField("Confirm password", text: Binding(get: { flow.passwordConfirm }, set: { flow.passwordConfirm = $0 }))
+                        passwordField("Login password", text: $flow.password)
+                        passwordField("Confirm password", text: $flow.passwordConfirm)
                     }
                     HStack {
                         secondary("Save Password") { flow.saveLoginPassword() }

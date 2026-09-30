@@ -11,21 +11,22 @@ DIST="$REPO_ROOT/dist"
 APP="$DIST/HeyMac.app"
 source "$SCRIPT_DIR/lib-signing.sh"
 
-echo "Building universal executables (release)..."
-ARM64_TRIPLE="arm64-apple-macosx14.0"
-X86_64_TRIPLE="x86_64-apple-macosx14.0"
-(cd "$REPO_ROOT" && swift build -c release --triple "$ARM64_TRIPLE" --product HeyMac)
-(cd "$REPO_ROOT" && swift build -c release --triple "$X86_64_TRIPLE" --product HeyMac)
-ARM64_BIN="$(cd "$REPO_ROOT" && swift build -c release --triple "$ARM64_TRIPLE" --show-bin-path)"
-X86_64_BIN="$(cd "$REPO_ROOT" && swift build -c release --triple "$X86_64_TRIPLE" --show-bin-path)"
+BUILD_ARCH="$(uname -m)"
+case "$BUILD_ARCH" in
+    arm64|x86_64) ;;
+    *) echo "Unsupported build architecture: $BUILD_ARCH" >&2; exit 1 ;;
+esac
+echo "Building $BUILD_ARCH executable (release)..."
+(cd "$REPO_ROOT" && swift build -c release --product HeyMac)
+BIN="$(cd "$REPO_ROOT" && swift build -c release --show-bin-path)"
 
 echo "Assembling $APP..."
 mkdir -p "$DIST" && touch "$DIST/.metadata_never_index"  # keeps Spotlight from listing this build copy as an installed app
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
-lipo -create "$ARM64_BIN/HeyMac" "$X86_64_BIN/HeyMac" -output "$APP/Contents/MacOS/HeyMac"
+cp "$BIN/HeyMac" "$APP/Contents/MacOS/HeyMac"
 # SwiftPM's resource bundle holds the Core ML models; the app looks for it here.
-cp -R "$ARM64_BIN/HeyMac_HeyMacCore.bundle" "$APP/Contents/Resources/"
+cp -R "$BIN/HeyMac_HeyMacCore.bundle" "$APP/Contents/Resources/"
 cp -R "$REPO_ROOT/Sources/HeyMacApp/Animations" "$APP/Contents/Resources/Animations"
 # Sparkle (the updater) is a framework the executable loads from Contents/Frameworks.
 SPARKLE="$(find "$REPO_ROOT/.build/artifacts/sparkle" -type d -name Sparkle.framework -path '*macos-arm64_x86_64*' | head -1)"
@@ -73,5 +74,5 @@ rm -f "$DMG"
 hdiutil create -volname "Hey Mac" -srcfolder "$STAGING" -ov -format UDZO "$DMG" >/dev/null
 rm -rf "$STAGING"
 
-"$SCRIPT_DIR/verify-app.sh" "$APP"
+HEYMAC_EXPECTED_ARCH="$BUILD_ARCH" "$SCRIPT_DIR/verify-app.sh" "$APP"
 echo "Built $DMG"

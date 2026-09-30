@@ -1,5 +1,6 @@
 import CryptoKit
 import Foundation
+import LocalAuthentication
 import Security
 
 public enum KeychainKeyProviderError: Error, Equatable {
@@ -69,7 +70,9 @@ public final class KeychainKeyProvider: SymmetricKeyProviding {
             kSecMatchLimit as String: kSecMatchLimitOne,
         ]
         if !interactive {
-            query[kSecUseAuthenticationUI as String] = kSecUseAuthenticationUIFail
+            let context = LAContext()
+            context.interactionNotAllowed = true
+            query[kSecUseAuthenticationContext as String] = context
         }
         var result: AnyObject?
         let status = SecItemCopyMatching(query as CFDictionary, &result)

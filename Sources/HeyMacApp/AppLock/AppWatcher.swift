@@ -35,9 +35,14 @@ final class AppWatcher {
 
         runningObservation = NSWorkspace.shared.observe(\.runningApplications, options: [.old, .new]) { [weak self] _, change in
             let known = Set((change.oldValue ?? []).map(\.processIdentifier))
-            let added = (change.newValue ?? []).filter { !known.contains($0.processIdentifier) }
-            DispatchQueue.main.async {
-                MainActor.assumeIsolated { added.forEach { self?.consider($0) } }
+            let addedProcessIDs = (change.newValue ?? [])
+                .map(\.processIdentifier)
+                .filter { !known.contains($0) }
+            Task { @MainActor [weak self, addedProcessIDs] in
+                let added = NSWorkspace.shared.runningApplications.filter {
+                    addedProcessIDs.contains($0.processIdentifier)
+                }
+                added.forEach { self?.consider($0) }
             }
         }
 

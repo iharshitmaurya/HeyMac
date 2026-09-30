@@ -45,7 +45,11 @@ public final class AntiSpoofClassifier: LivenessChecking {
         }
         do {
             let compiledURL = try MLModel.compileModel(at: url)
-            self.model = try MLModel(contentsOf: compiledURL)
+            let configuration = MLModelConfiguration()
+            #if arch(x86_64)
+            configuration.computeUnits = .cpuOnly
+            #endif
+            self.model = try MLModel(contentsOf: compiledURL, configuration: configuration)
         } catch {
             throw AntiSpoofError.modelLoadFailed
         }
@@ -75,6 +79,11 @@ public final class AntiSpoofClassifier: LivenessChecking {
         else {
             throw AntiSpoofError.inferenceFailed
         }
-        return (0..<3).map { multiArray[$0].floatValue }
+                let probabilities = (0..<3).map { multiArray[$0].floatValue }
+                guard probabilities.allSatisfy({ $0.isFinite && (0...1).contains($0) }),
+                            abs(probabilities.reduce(0, +) - 1) <= 0.01 else {
+                        throw AntiSpoofError.inferenceFailed
+                }
+                return probabilities
     }
 }

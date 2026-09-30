@@ -27,6 +27,7 @@ public final class CameraCapture: NSObject, FrameSource, AVCaptureVideoDataOutpu
     private let frameLock = NSLock()
     private let warmup: TimeInterval
     private let minFrameInterval: TimeInterval = 0.1
+    private var activeUsers = 0
     private var configured = false
     private var startedAt = Date.distantFuture
     private var lastConverted = Date.distantPast
@@ -60,11 +61,15 @@ public final class CameraCapture: NSObject, FrameSource, AVCaptureVideoDataOutpu
             startedAt = Date()
         }
         if !session.isRunning { session.startRunning() }
+        activeUsers += 1
     }
 
     public func stop() {
         sessionLock.lock()
         defer { sessionLock.unlock() }
+        guard activeUsers > 0 else { return }
+        activeUsers -= 1
+        guard activeUsers == 0 else { return }
         if session.isRunning { session.stopRunning() }
         frameLock.withLock {
             latest = nil

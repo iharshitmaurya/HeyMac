@@ -17,7 +17,9 @@ public enum SelfCheck {
             let classifier = try AntiSpoofClassifier()
             let dark = try classifier.classify(patch: patch(value: 10))
             let bright = try classifier.classify(patch: patch(value: 240))
-            if abs(dark.confidence - bright.confidence) < 1e-6 && dark.isLive == bright.isLive {
+            if !dark.confidence.isFinite || !bright.confidence.isFinite {
+                problems.append("anti-spoof model returns a non-finite confidence")
+            } else if abs(dark.confidence - bright.confidence) < 1e-6 && dark.isLive == bright.isLive {
                 problems.append("anti-spoof model returns the same answer for every input")
             }
         } catch {
