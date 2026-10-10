@@ -252,6 +252,29 @@ private struct LockScreenPane: View {
                 .animation(.easeInOut(duration: 0.2), value: model.animationEnabled)
             }
         }
+
+        PaneSection(header: "Edge light",
+                    footnote: "Illuminates screen edges in low light so your face can be recognized in dark rooms.") {
+            SettingsCard {
+                switchRow("Use Edge Light in dark rooms",
+                          isOn: Binding(get: { model.edgeLightEnabled }, set: { model.setEdgeLightEnabled($0) }))
+                if model.edgeLightEnabled {
+                    RowDivider()
+                    HStack {
+                        VStack(alignment: .leading, spacing: Spacing.xxs) {
+                            Text("Preview Edge Light").font(Typography.rowTitle)
+                            Text("Temporarily displays the glowing screen border.").font(Typography.caption).foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        Button("Preview") {
+                            model.previewEdgeLight()
+                        }
+                        .buttonStyle(PillButtonStyle(kind: .secondary))
+                    }
+                    .padding(.horizontal, Surface.rowInset).padding(.vertical, Spacing.md)
+                }
+            }
+        }
     }
 
     private var passwordForm: some View {

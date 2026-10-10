@@ -167,8 +167,18 @@ final class SetupFlow {
         startPreview()
         let verifier = runtime.verifier(interactive: true, strictness: model.strictness)
         DispatchQueue.global(qos: .userInitiated).async {
-            let outcome = verifier.run(timeout: 8, requiredConsecutive: 2, waitForTurn: 1, keepGoing: { true })
+            let outcome = verifier.run(
+                timeout: 8, requiredConsecutive: 2, waitForTurn: 1, keepGoing: { true },
+                onLowLight: {
+                    DispatchQueue.main.async {
+                        if self.model.settings.edgeLightEnabled {
+                            EdgeLightController.shared.show(onLockScreen: false)
+                        }
+                    }
+                }
+            )
             DispatchQueue.main.async { [self] in
+                EdgeLightController.shared.hide()
                 testing = false
                 testPassed = outcome.matched
                 if outcome.matched {
@@ -296,6 +306,7 @@ final class SetupFlow {
         advanceTask?.cancel()
         enrolling = false
         stopPreview()
+        EdgeLightController.shared.hide()
 
         // If the user didn't finish the wizard normally (setupComplete is still false for
         // first-time setup), roll back any face data captured during this session.
