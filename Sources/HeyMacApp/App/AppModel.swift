@@ -23,6 +23,9 @@ final class AppModel {
     private var controller: EngineController?
 
     private(set) var setupComplete = false
+    private(set) var enrolledFacesCount = 0
+    private(set) var enrolledFaceSlots: [Int] = []
+    var isFaceListExpanded = false
     private(set) var lockScreenEnabled = false
     private(set) var paused = false
     private(set) var lockScreenNeedsPassword = false
@@ -106,6 +109,9 @@ final class AppModel {
 
     func reloadSettings() {
         setupComplete = settings.setupComplete
+        let pipeline = runtime?.pipeline(interactive: false, strictness: .normal)
+        enrolledFaceSlots = pipeline?.enrolledSlots() ?? []
+        enrolledFacesCount = enrolledFaceSlots.count
         lockScreenEnabled = settings.lockScreenEnabled
         paused = settings.paused
         lockScreenNeedsPassword = settings.lockScreenNeedsPassword
@@ -313,6 +319,25 @@ final class AppModel {
         }
     }
 
+    func removeFaceData(at slot: Int) {
+        stopEngine()
+        do {
+            try runtime?.removeFaceData(at: slot)
+        } catch {
+            actionError = "Could not remove face data: \(error)"
+        }
+        reloadSettings()
+        if enrolledFacesCount == 0 {
+            settings.resetAll()
+            reloadSettings()
+            refreshSystemState()
+            openSetup()
+        } else {
+            restartEngine()
+        }
+        log.write("removed face data at slot \(slot)")
+    }
+
     func removeAllData() {
         stopEngine()
         do {
@@ -390,13 +415,12 @@ final class AppModel {
     }
 
     func reEnroll() {
-        // Verification must not run against a half-written enrollment, and the camera can
-        // only serve one user at a time.
-        settings.setupComplete = false
-        reloadSettings()
+        // The camera can only serve one user at a time, so stop the engine while enrolling.
+        // We do NOT change setupComplete — existing face data is untouched; the new face
+        // writes to a fresh slot.
         stopEngine()
         let flow = SetupFlow(model: self, startAt: .enroll)
-        windows.show(id: "setup", title: "Re-enroll Your Face", size: CGSize(width: 720, height: 540), resizable: true, minSize: CGSize(width: 640, height: 500),
+        windows.show(id: "setup", title: "Enroll Face ID", size: CGSize(width: 720, height: 540), resizable: true, minSize: CGSize(width: 640, height: 500),
                      replacing: true, onClose: { flow.teardown() }) {
             SetupWizardView(flow: flow)
         }

@@ -338,10 +338,37 @@ private struct FacePane: View {
         VStack(spacing: Spacing.md) {
             FaceActionRow(icon: "faceid", title: "Test Now…",
                           caption: "Check if your face is recognized correctly.", tone: .neutral) { model.openTest() }
-            FaceActionRow(icon: "arrow.triangle.2.circlepath", title: "Re-enroll My Face…",
-                          caption: "Update your face data with a new scan.", tone: .neutral) { model.reEnroll() }
-            FaceActionRow(icon: "trash", title: "Remove My Face Data…",
-                          caption: "Removes your face data and disables face unlock.", tone: .danger) { confirmRemoval() }
+            if model.enrolledFacesCount < 3 {
+                FaceActionRow(icon: "person.badge.plus",
+                              title: "Add Face ID (\(model.enrolledFacesCount)/3)…",
+                              caption: "Enroll another face to unlock your Mac.", tone: .neutral) { model.reEnroll() }
+            } else {
+                FaceActionRow(icon: "person.badge.plus",
+                              title: "Add Face ID (3/3)",
+                              caption: "Maximum of 3 Face IDs reached.", tone: .neutral) {}.disabled(true)
+            }
+
+            if model.enrolledFacesCount > 0 {
+                FaceActionRow(icon: "list.bullet.rectangle.portrait",
+                              title: "Manage Enrolled Faces",
+                              caption: "View and remove specific Face IDs.", tone: .neutral,
+                              isExpanded: model.isFaceListExpanded) {
+                    withAnimation { model.isFaceListExpanded.toggle() }
+                }
+
+                if model.isFaceListExpanded {
+                    ForEach(model.enrolledFaceSlots, id: \.self) { slot in
+                        FaceActionRow(icon: "person.crop.circle.badge.minus",
+                                      title: "Remove Face ID \(slot + 1)…",
+                                      caption: "Removes this specific face data.", tone: .danger) {
+                            model.removeFaceData(at: slot)
+                        }
+                    }
+                }
+            }
+
+            FaceActionRow(icon: "trash", title: "Remove All Face Data…",
+                          caption: "Removes all face data and disables face unlock.", tone: .danger) { confirmRemoval() }
         }
         .disabled(!model.setupComplete)
 
@@ -375,7 +402,7 @@ private struct FacePane: View {
                 HStack(spacing: Spacing.lg) {
                     FaceIconCircle(icon: "checkmark.shield.fill", tint: Theme.good, ink: Theme.goodText)
                     VStack(alignment: .leading, spacing: Spacing.xxs) {
-                        Text("Enrolled").font(Typography.sectionTitle)
+                        Text("\(model.enrolledFacesCount) Face ID\(model.enrolledFacesCount == 1 ? "" : "s") Enrolled").font(Typography.sectionTitle)
                         CaptionText("Your face data is securely stored on this Mac.")
                     }
                     Spacer(minLength: 0)
@@ -390,11 +417,11 @@ private struct FacePane: View {
     /// Cancel is the default (Return) button; the destructive confirm is second and never the default.
     private func confirmRemoval() {
         let alert = NSAlert()
-        alert.messageText = "Remove your face data?"
-        alert.informativeText = "This deletes your enrolled face, the stored login password and the encryption key and turns off lock-screen face unlock. You can set Hey Mac up again afterwards."
+        alert.messageText = "Remove all face data?"
+        alert.informativeText = "This deletes all enrolled faces, the stored login password and the encryption key and turns off lock-screen face unlock. You can set Hey Mac up again afterwards."
         alert.alertStyle = .warning
         alert.addButton(withTitle: "Cancel")
-        let remove = alert.addButton(withTitle: "Remove")
+        let remove = alert.addButton(withTitle: "Remove All")
         remove.hasDestructiveAction = true
         if alert.runModal() == .alertSecondButtonReturn {
             model.removeAllData()
@@ -511,7 +538,8 @@ private struct FaceActionRow: View {
     let icon: String
     let title: String
     let caption: String
-    let tone: Tone
+    var tone: Tone = .neutral
+    var isExpanded: Bool? = nil
     let action: () -> Void
 
     @Environment(\.isEnabled) private var isEnabled
@@ -543,8 +571,13 @@ private struct FaceActionRow: View {
                         CaptionText(caption)
                     }
                     Spacer(minLength: Spacing.sm)
-                    Image(systemName: "chevron.right").font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(.secondary).accessibilityHidden(true)
+                    if let isExpanded {
+                        Image(systemName: isExpanded ? "chevron.down" : "chevron.right").font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(.secondary).accessibilityHidden(true)
+                    } else {
+                        Image(systemName: "chevron.right").font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(.secondary).accessibilityHidden(true)
+                    }
                 }
             }
             .contentShape(Rectangle())

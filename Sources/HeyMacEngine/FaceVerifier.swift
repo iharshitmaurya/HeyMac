@@ -51,11 +51,11 @@ public final class FaceVerifier: FaceMatching, @unchecked Sendable {
         }
         defer { sessionLock.unlock() }
 
-        // Load the enrollment before touching the camera: no enrollment or no key access
+        // Load the enrollments before touching the camera: no enrollment or no key access
         // fails instantly, without flashing the camera light.
-        let centroid: FaceEmbedding
+        let centroids: [FaceEmbedding]
         do {
-            centroid = try pipeline.loadEnrolledCentroid()
+            centroids = try pipeline.loadEnrolledCentroids()
         } catch KeychainKeyProviderError.interactionRequired {
             outcome.failure = "keychain access needs approval: open Hey Mac and run the face test"
             return outcome
@@ -85,7 +85,7 @@ public final class FaceVerifier: FaceMatching, @unchecked Sendable {
             }
             lastSequence = frame.sequence
             do {
-                let evaluation = try pipeline.evaluate(image: frame.image, against: centroid)
+                let evaluation = try pipeline.evaluate(image: frame.image, against: centroids)
                 outcome.framesEvaluated += 1
                 outcome.bestSimilarity = max(outcome.bestSimilarity, evaluation.similarity)
                 outcome.bestLiveness = max(outcome.bestLiveness, evaluation.liveness)
