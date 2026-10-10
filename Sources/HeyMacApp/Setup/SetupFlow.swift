@@ -136,7 +136,7 @@ final class SetupFlow {
             enrollHint = "Make sure it's your real face, well lit — photos and screens are rejected."
             enrollHintTone = .warn
         case .finished(let minAgreement, _):
-            let currentSlots = Set(model.runtime?.pipeline(interactive: true, strictness: .normal)?.enrolledSlots() ?? [])
+            let currentSlots = Set(model.runtime?.pipeline(interactive: true, strictness: .normal).enrolledSlots() ?? [])
             let newlyAdded = currentSlots.subtracting(initialSlots)
             slotsAddedDuringSession.formUnion(newlyAdded)
             model.reloadSettings()
