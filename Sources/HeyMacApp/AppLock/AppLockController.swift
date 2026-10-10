@@ -37,36 +37,24 @@ final class AppLockController {
         watcher.isLocked = { [store] in store.isLocked($0) }
         watcher.onCandidate = { [weak self] in self?.handleCandidate($0) }
         watcher.onActivate = { [weak self] app in
-            guard let self else { return }
-            if let id = app.bundleIdentifier { self.sessions.focusGained(id, privacyLevel: self.store.privacyLevel) }
-            self.abandonEpisodeIfSwitchedAway(to: app)
+            if let id = app.bundleIdentifier { self?.sessions.focusGained(id) }
+            self?.abandonEpisodeIfSwitchedAway(to: app)
         }
         watcher.onDeactivate = { [weak self] app in
-            guard let self else { return }
-            if let id = app.bundleIdentifier { self.sessions.focusLost(id, privacyLevel: self.store.privacyLevel) }
+            if let id = app.bundleIdentifier { self?.sessions.focusLost(id) }
         }
         watcher.onBackgroundLocked = { [weak self] app in
-            guard let self, let id = app.bundleIdentifier, !self.sessions.isUnlocked(id, privacyLevel: self.store.privacyLevel),
-                !app.isHidden
-            else { return }
+            guard let self, let id = app.bundleIdentifier, !self.sessions.isUnlocked(id), !app.isHidden else { return }
             // Never touch the episode's own apps (active or queued) or one that is still launching.
             let pid = app.processIdentifier
-            if activeApp?.processIdentifier == pid
-                || queue.contains(where: { $0.processIdentifier == pid })
-            {
-                return
-            }
+            if activeApp?.processIdentifier == pid || queue.contains(where: { $0.processIdentifier == pid }) { return }
             if let launched = app.launchDate, Date().timeIntervalSince(launched) < 5 { return }
-            
-            if self.store.privacyLevel == .high {
-                log("hiding \(id): background-locked")
-                app.hide()
-            }
+            log("hiding \(id): background-locked")
+            app.hide()
         }
         watcher.onTerminate = { [weak self] app in self?.handleTerminate(app) }
         watcher.start()
         observeSystemEvents()
-
     }
 
     func stop() {
@@ -95,12 +83,10 @@ final class AppLockController {
     // MARK: - Episodes
 
     private func handleCandidate(_ app: NSRunningApplication) {
-        guard let id = app.bundleIdentifier, !sessions.isUnlocked(id, privacyLevel: store.privacyLevel) else { return }
+        guard let id = app.bundleIdentifier, !sessions.isUnlocked(id) else { return }
         if activeApp?.processIdentifier == app.processIdentifier { return }
         guard activeApp == nil else {
-            if !queue.contains(where: { $0.processIdentifier == app.processIdentifier }) {
-                queue.append(app)
-            }
+            if !queue.contains(where: { $0.processIdentifier == app.processIdentifier }) { queue.append(app) }
             return
         }
         begin(app)
@@ -113,9 +99,8 @@ final class AppLockController {
         activeApp = app
         shield.model.onRetry = { [weak self] in self?.retry() }
         shield.model.onQuitApp = { [weak self] in self?.quitActiveApp() }
-        shield.present(
-            appName: app.localizedName ?? app.bundleIdentifier ?? "App", icon: app.icon,
-            pid: app.processIdentifier, mode: ShieldMode.saved)
+        shield.present(appName: app.localizedName ?? app.bundleIdentifier ?? "App", icon: app.icon,
+                       pid: app.processIdentifier, mode: ShieldMode.saved)
         // Us, not the locked app, must be frontmost so keystrokes can't reach it.
         NSApp.activate(ignoringOtherApps: true)
         startAuthentication(for: app)
@@ -128,9 +113,7 @@ final class AppLockController {
             guard let self else { return }
             let name = app.localizedName ?? "this app"
             let outcome = await makeCoordinator().run(reason: "Unlock \(name)")
-            guard !Task.isCancelled, activeApp?.processIdentifier == app.processIdentifier else {
-                return
-            }
+            guard !Task.isCancelled, activeApp?.processIdentifier == app.processIdentifier else { return }
             await finish(app, outcome)
         }
     }
@@ -141,11 +124,11 @@ final class AppLockController {
         case .unlocked:
             log("finish \(bid): unlocked")
             if let id = app.bundleIdentifier {
-                sessions.unlock(id, policy: store.app(id)?.policy ?? .everyTime)
+                sessions.unlock(id, policy: store.app(id)?.policy ?? .afterMinutes(5))
             }
             NotchOverlayController.shared.finish(success: true)
             shield.model.phase = .unlocked
-            try? await Task.sleep(for: .milliseconds(450))  // let the unlock clip start
+            try? await Task.sleep(for: .milliseconds(450)) // let the unlock clip start
             guard activeApp?.processIdentifier == app.processIdentifier else { return }
             log("shield dismissed: unlocked")
             shield.dismiss()
@@ -162,7 +145,6 @@ final class AppLockController {
             NotchOverlayController.shared.finish(success: false)
             shield.model.phase = .needsAuth(message)
         }
-
     }
 
     private func retry() {
@@ -174,10 +156,9 @@ final class AppLockController {
     private func quitActiveApp() {
         episode?.cancel()
         log("hiding \(activeApp?.bundleIdentifier ?? "?"): quit-app")
-        activeApp?.hide()  // a save sheet or window must not show once the shield drops
+        activeApp?.hide() // a save sheet or window must not show once the shield drops
         activeApp?.terminate()
         NotchOverlayController.shared.cancelScanning()
-
         log("shield dismissed: quit-app")
         shield.dismiss()
         endEpisode()
@@ -196,10 +177,7 @@ final class AppLockController {
         activeApp = nil
         justActivatedPID = nil
         queue.removeAll()
-        if hadEpisode { 
-            NotchOverlayController.shared.cancelScanning()
-
-        }  // the island may belong to a lock-screen scan
+        if hadEpisode { NotchOverlayController.shared.cancelScanning() } // the island may belong to a lock-screen scan
         log("shield dismissed: revoked/stopped")
         shield.dismiss()
     }
@@ -210,14 +188,10 @@ final class AppLockController {
     /// The late `didActivate` of the app `finish` just unlocked and activated is skipped once
     /// (`justActivatedPID`), so it can't kill the next queued episode.
     private func abandonEpisodeIfSwitchedAway(to app: NSRunningApplication) {
-        if app.processIdentifier == justActivatedPID {
-            justActivatedPID = nil
-            return
-        }
+        if app.processIdentifier == justActivatedPID { justActivatedPID = nil; return }
         guard let locked = activeApp, app.activationPolicy == .regular,
-            app.processIdentifier != locked.processIdentifier,
-            app.processIdentifier != ProcessInfo.processInfo.processIdentifier
-        else { return }
+              app.processIdentifier != locked.processIdentifier,
+              app.processIdentifier != ProcessInfo.processInfo.processIdentifier else { return }
         let lockedPID = locked.processIdentifier
         let otherPID = app.processIdentifier
         let lockedID = locked.bundleIdentifier ?? "?"
@@ -228,20 +202,16 @@ final class AppLockController {
             MainActor.assumeIsolated {
                 guard let self else { return }
                 guard let current = self.activeApp, current.processIdentifier == lockedPID,
-                    NSWorkspace.shared.frontmostApplication?.processIdentifier == otherPID
-                else {
+                      NSWorkspace.shared.frontmostApplication?.processIdentifier == otherPID else {
                     self.log("abandon cancelled: \(lockedID) (transient activation of \(otherID))")
                     return
                 }
                 self.episode?.cancel()
                 NotchOverlayController.shared.cancelScanning()
-
                 self.log("shield dismissed: switched-away to \(otherID)")
                 self.shield.dismiss()
-                if self.store.privacyLevel == .high {
-                    self.log("hiding \(lockedID): switched-away")
-                    current.hide()
-                }
+                self.log("hiding \(lockedID): switched-away")
+                current.hide()
                 self.endEpisode()
             }
         }
@@ -254,7 +224,6 @@ final class AppLockController {
         if activeApp?.processIdentifier == app.processIdentifier {
             episode?.cancel()
             NotchOverlayController.shared.cancelScanning()
-
             log("shield dismissed: app-terminated")
             shield.dismiss()
             endEpisode()
@@ -277,25 +246,21 @@ final class AppLockController {
             NSWorkspace.sessionDidResignActiveNotification,
         ]
         for name in names {
-            systemTokens.append(
-                center.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
-                    MainActor.assumeIsolated { self?.revokeAll() }
-                })
-        }
-        distributedTokens.append(
-            DistributedNotificationCenter.default().addObserver(
-                forName: Notification.Name("com.apple.screenIsLocked"), object: nil, queue: .main
-            ) { [weak self] _ in
+            systemTokens.append(center.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
                 MainActor.assumeIsolated { self?.revokeAll() }
             })
+        }
+        distributedTokens.append(DistributedNotificationCenter.default().addObserver(
+            forName: Notification.Name("com.apple.screenIsLocked"), object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.revokeAll() }
+        })
     }
 
     private func revokeAll() {
         sessions.revokeAll()
-        if store.privacyLevel == .high {
-            if let a = activeApp { log("hiding \(a.bundleIdentifier ?? "?"): revoke") }
-            activeApp?.hide()
-        }
+        if let a = activeApp { log("hiding \(a.bundleIdentifier ?? "?"): revoke") }
+        activeApp?.hide()
         endEverything()
     }
 }

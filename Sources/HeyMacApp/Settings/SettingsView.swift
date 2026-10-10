@@ -1,7 +1,7 @@
 import AppKit
-import HeyMacEngine
 import Observation
 import SwiftUI
+import HeyMacEngine
 
 enum SettingsPane: String, CaseIterable, Identifiable {
     case status = "Status"
@@ -57,9 +57,7 @@ struct SettingsView: View {
     private var sidebar: some View {
         VStack(alignment: .leading, spacing: Spacing.xxs) {
             ForEach(SettingsPane.allCases) { item in
-                SidebarItem(
-                    title: item.rawValue, systemImage: item.icon, isSelected: selection.pane == item
-                ) {
+                SidebarItem(title: item.rawValue, systemImage: item.icon, isSelected: selection.pane == item) {
                     selection.pane = item
                 }
                 .accessibilityLabel(item.rawValue)
@@ -113,10 +111,7 @@ struct PaneSection<Content: View>: View {
 }
 
 /// A switch row inside a card: the title is the VoiceOver label.
-private func switchRow(
-    _ title: String, caption: String? = nil, chip: StatusChip? = nil, isOn: Binding<Bool>,
-    disabled: Bool = false
-) -> some View {
+private func switchRow(_ title: String, caption: String? = nil, chip: StatusChip? = nil, isOn: Binding<Bool>, disabled: Bool = false) -> some View {
     FormRow(title: title, caption: caption, chip: chip) {
         Toggle(title, isOn: isOn)
             .labelsHidden().toggleStyle(.switch).tint(Theme.accent).disabled(disabled)
@@ -135,8 +130,7 @@ private struct StatusPane: View {
             HStack(spacing: Spacing.md) {
                 ZStack {
                     Circle().fill(Theme.accent)
-                    Image(systemName: "checkmark").font(.system(size: 14, weight: .bold))
-                        .foregroundStyle(Theme.accentInk)
+                    Image(systemName: "checkmark").font(.system(size: 14, weight: .bold)).foregroundStyle(Theme.accentInk)
                 }
                 .frame(width: 36, height: 36)
                 .accessibilityHidden(true)
@@ -150,10 +144,8 @@ private struct StatusPane: View {
                 .layoutPriority(1)
                 Spacer(minLength: Spacing.sm)
                 VStack(alignment: .trailing, spacing: 0) {
-                    Text("\(model.unlocksToday)").font(.system(size: 20, weight: .bold))
-                        .monospacedDigit()
-                    Text("unlocks today").font(Typography.caption).foregroundStyle(.secondary)
-                        .lineLimit(1)
+                    Text("\(model.unlocksToday)").font(.system(size: 20, weight: .bold)).monospacedDigit()
+                    Text("unlocks today").font(Typography.caption).foregroundStyle(.secondary).lineLimit(1)
                 }
                 .fixedSize()
             }
@@ -162,14 +154,11 @@ private struct StatusPane: View {
 
         PaneSection {
             SettingsCard {
-                switchRow(
-                    "Start Hey Mac at login",
-                    isOn: Binding(get: { model.launchAtLogin }, set: { model.setLaunchAtLogin($0) })
-                )
+                switchRow("Start Hey Mac at login",
+                          isOn: Binding(get: { model.launchAtLogin }, set: { model.setLaunchAtLogin($0) }))
                 RowDivider()
-                switchRow(
-                    "Pause face unlock", caption: "Falls back to your password immediately",
-                    isOn: Binding(get: { model.paused }, set: { model.setPaused($0) }))
+                switchRow("Pause face unlock", caption: "Falls back to your password immediately",
+                          isOn: Binding(get: { model.paused }, set: { model.setPaused($0) }))
             }
         }
 
@@ -214,16 +203,13 @@ private struct LockScreenPane: View {
         PaneTitle("Lock Screen")
 
         SettingsCard {
-            switchRow(
-                "Unlock the lock screen with my face", chip: lockChip,
-                isOn: Binding(
-                    get: { model.lockScreenEnabled }, set: { model.setLockScreenEnabled($0) }))
+            switchRow("Unlock the lock screen with my face", chip: lockChip,
+                      isOn: Binding(get: { model.lockScreenEnabled }, set: { model.setLockScreenEnabled($0) }))
             if !hasPassword, let reason = model.actionError {
                 RowDivider()
                 HStack(alignment: .firstTextBaseline, spacing: Spacing.sm) {
                     Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(Theme.warn)
-                    Text(reason).foregroundStyle(Theme.warnText).fixedSize(
-                        horizontal: false, vertical: true)
+                    Text(reason).foregroundStyle(Theme.warnText).fixedSize(horizontal: false, vertical: true)
                     Spacer(minLength: 0)
                 }
                 .font(Typography.caption)
@@ -231,24 +217,15 @@ private struct LockScreenPane: View {
             }
         }
 
-        PaneSection(
-            header: "Login password",
-            footnote:
-                "Your face can't unlock a Mac by itself, so Hey Mac types your password for you after it recognizes you. It's stored encrypted on this Mac and never sent anywhere."
-        ) {
+        PaneSection(header: "Login password",
+                    footnote: "Your face can't unlock a Mac by itself, so Hey Mac types your password for you after it recognizes you. It's stored encrypted on this Mac and never sent anywhere.") {
             SettingsCard { passwordForm }
         }
 
-        PaneSection(
-            header: "Matching strictness",
-            footnote:
-                "Stricter means fewer false matches, but it may not recognize you in poor light."
-        ) {
+        PaneSection(header: "Matching strictness",
+                    footnote: "Stricter means fewer false matches, but it may not recognize you in poor light.") {
             SettingsCard {
-                Picker(
-                    "Matching strictness",
-                    selection: Binding(get: { model.strictness }, set: { model.setStrictness($0) })
-                ) {
+                Picker("Matching strictness", selection: Binding(get: { model.strictness }, set: { model.setStrictness($0) })) {
                     ForEach(MatchStrictness.allCases, id: \.self) { level in
                         Text(level.title).tag(level)
                     }
@@ -257,35 +234,12 @@ private struct LockScreenPane: View {
                 .padding(Spacing.lg)
             }
         }
-        
-        PaneSection(
-            header: "Privacy level",
-            footnote:
-                "Choose how apps are secured. Low: one time on start. Standard: time-based. High: every window switch."
-        ) {
-            SettingsCard {
-                Picker(
-                    "Privacy level",
-                    selection: Binding(get: { model.appLockPrivacyLevel }, set: { model.setAppLockPrivacyLevel($0) })
-                ) {
-                    ForEach(PrivacyLevel.allCases, id: \.self) { level in
-                        Text(level.rawValue).tag(level)
-                    }
-                }
-                .pickerStyle(.segmented).labelsHidden()
-                .padding(Spacing.lg)
-            }
-        }
 
-        PaneSection(
-            header: "Unlock animation",
-            footnote: "Choosing a style plays it at the top of your screen."
-        ) {
+        PaneSection(header: "Unlock animation",
+                    footnote: "Choosing a style plays it at the top of your screen.") {
             SettingsCard {
-                switchRow(
-                    "Play an animation when unlocking",
-                    isOn: Binding(
-                        get: { model.animationEnabled }, set: { model.setAnimationEnabled($0) }))
+                switchRow("Play an animation when unlocking",
+                          isOn: Binding(get: { model.animationEnabled }, set: { model.setAnimationEnabled($0) }))
                 RowDivider()
                 ForEach(UnlockAnimationStyle.allCases) { style in
                     AnimationChoiceRow(style: style, isSelected: model.animationStyle == style) {
@@ -304,21 +258,16 @@ private struct LockScreenPane: View {
         VStack(alignment: .leading, spacing: Spacing.md) {
             HStack(spacing: Spacing.md) {
                 VStack(alignment: .leading, spacing: Spacing.xxs) {
-                    Text(hasPassword ? "Password saved" : "No password saved yet").font(
-                        Typography.rowTitle)
+                    Text(hasPassword ? "Password saved" : "No password saved yet").font(Typography.rowTitle)
                     if hasPassword, !form.isChanging, let message = form.message {
                         Text(message).font(Typography.caption).foregroundStyle(Theme.goodText)
                     }
                 }
                 Spacer(minLength: Spacing.sm)
-                StatusChip(
-                    text: hasPassword ? "Saved" : "Not saved", tone: hasPassword ? .good : .warn)
+                StatusChip(text: hasPassword ? "Saved" : "Not saved", tone: hasPassword ? .good : .warn)
                 if hasPassword, !form.isChanging {
-                    Button("Change Password…") {
-                        form.isChanging = true
-                        form.message = nil
-                    }
-                    .buttonStyle(PillButtonStyle(kind: .secondary))
+                    Button("Change Password…") { form.isChanging = true; form.message = nil }
+                        .buttonStyle(PillButtonStyle(kind: .secondary))
                 }
             }
             if !hasPassword || form.isChanging { fields }
@@ -327,27 +276,18 @@ private struct LockScreenPane: View {
     }
 
     @ViewBuilder private var fields: some View {
-        SecureField(
-            hasPassword ? "New login password" : "Login password",
-            text: Binding(get: { form.password }, set: { form.password = $0 })
-        )
-        .textFieldStyle(.roundedBorder)
-        SecureField(
-            "Confirm password", text: Binding(get: { form.confirm }, set: { form.confirm = $0 })
-        )
-        .textFieldStyle(.roundedBorder)
+        SecureField(hasPassword ? "New login password" : "Login password",
+                    text: Binding(get: { form.password }, set: { form.password = $0 }))
+            .textFieldStyle(.roundedBorder)
+        SecureField("Confirm password", text: Binding(get: { form.confirm }, set: { form.confirm = $0 }))
+            .textFieldStyle(.roundedBorder)
         HStack(spacing: Spacing.md) {
             Button(hasPassword ? "Update Password" : "Save Password") { save() }
                 .buttonStyle(PillButtonStyle(kind: .primary))
                 .disabled(form.password.isEmpty)
             if hasPassword {
-                Button("Cancel") {
-                    form.isChanging = false
-                    form.password = ""
-                    form.confirm = ""
-                    form.message = nil
-                }
-                .buttonStyle(PillButtonStyle(kind: .secondary))
+                Button("Cancel") { form.isChanging = false; form.password = ""; form.confirm = ""; form.message = nil }
+                    .buttonStyle(PillButtonStyle(kind: .secondary))
             }
             if let message = form.message {
                 Text(message).font(Typography.caption)
@@ -360,20 +300,16 @@ private struct LockScreenPane: View {
 
     private func save() {
         guard form.password == form.confirm else {
-            form.message = "The two passwords don't match."
-            form.messageIsError = true
+            form.message = "The two passwords don't match."; form.messageIsError = true
             return
         }
         if let error = model.saveLoginPassword(form.password) {
-            form.message = error
-            form.messageIsError = true
+            form.message = error; form.messageIsError = true
             return
         }
         let wasBlocked = model.actionError != nil
-        form.password = ""
-        form.confirm = ""
-        form.message = "Password saved."
-        form.messageIsError = false
+        form.password = ""; form.confirm = ""
+        form.message = "Password saved."; form.messageIsError = false
         form.isChanging = false
         form.saveCount += 1
         model.actionError = nil
@@ -400,54 +336,45 @@ private struct FacePane: View {
         statusCard
 
         VStack(spacing: Spacing.md) {
-            FaceActionRow(
-                icon: "faceid", title: "Test Now…",
-                caption: "Check if your face is recognized correctly.", tone: .neutral
-            ) { model.openTest() }
+            FaceActionRow(icon: "faceid", title: "Test Now…",
+                          caption: "Check if your face is recognized correctly.", tone: .neutral) { model.openTest() }
             if model.enrolledFacesCount < 3 {
-                FaceActionRow(
-                    icon: "person.badge.plus",
-                    title: "Add Face ID (\(model.enrolledFacesCount)/3)…",
-                    caption: "Enroll another face to unlock your Mac.", tone: .neutral
-                ) { model.reEnroll() }
+                FaceActionRow(icon: "person.badge.plus",
+                              title: "Add Face ID (\(model.enrolledFacesCount)/3)…",
+                              caption: "Enroll another face to unlock your Mac.", tone: .neutral) { model.reEnroll() }
             } else {
-                FaceActionRow(
-                    icon: "person.badge.plus", title: "Add Face ID (3/3)",
-                    caption: "Maximum of 3 Face IDs reached.", tone: .neutral
-                ) {}.disabled(true)
+                FaceActionRow(icon: "person.badge.plus",
+                              title: "Add Face ID (3/3)",
+                              caption: "Maximum of 3 Face IDs reached.", tone: .neutral) {}.disabled(true)
             }
 
             if model.enrolledFacesCount > 0 {
-                FaceActionRow(
-                    icon: "list.bullet.rectangle.portrait", title: "Manage Enrolled Faces",
-                    caption: "View and remove specific Face IDs.", tone: .neutral,
-                    isExpanded: model.isFaceListExpanded
-                ) {
+                FaceActionRow(icon: "list.bullet.rectangle.portrait",
+                              title: "Manage Enrolled Faces",
+                              caption: "View and remove specific Face IDs.", tone: .neutral,
+                              isExpanded: model.isFaceListExpanded) {
                     withAnimation { model.isFaceListExpanded.toggle() }
                 }
 
                 if model.isFaceListExpanded {
                     ForEach(model.enrolledFaceSlots, id: \.self) { slot in
-                        FaceActionRow(
-                            icon: "person.crop.circle.badge.minus",
-                            title: "Remove Face ID \(slot + 1)…",
-                            caption: "Removes this specific face data.", tone: .danger
-                        ) { model.removeFaceData(at: slot) }
+                        FaceActionRow(icon: "person.crop.circle.badge.minus",
+                                      title: "Remove Face ID \(slot + 1)…",
+                                      caption: "Removes this specific face data.", tone: .danger) {
+                            model.removeFaceData(at: slot)
+                        }
                     }
                 }
             }
-            FaceActionRow(
-                icon: "trash", title: "Remove All Face Data…",
-                caption: "Removes all face data and disables face unlock.", tone: .danger
-            ) { confirmRemoval() }
+
+            FaceActionRow(icon: "trash", title: "Remove All Face Data…",
+                          caption: "Removes all face data and disables face unlock.", tone: .danger) { confirmRemoval() }
         }
         .disabled(!model.setupComplete)
 
         HStack(alignment: .top, spacing: Spacing.sm) {
             Image(systemName: "info.circle").foregroundStyle(.secondary).accessibilityHidden(true)
-            CaptionText(
-                "Removing your face data also turns off lock-screen unlock, and deletes the stored password."
-            )
+            CaptionText("Removing your face data also turns off lock-screen unlock, and deletes the stored password.")
         }
         .padding(.horizontal, Spacing.xs)
     }
@@ -458,10 +385,7 @@ private struct FacePane: View {
                 .font(.system(size: 22, weight: .regular))
                 .foregroundStyle(Theme.accentText)
                 .frame(width: 48, height: 48)
-                .background(
-                    Theme.accent.opacity(0.16),
-                    in: RoundedRectangle(cornerRadius: Radius.lg, style: Radius.style)
-                )
+                .background(Theme.accent.opacity(0.16), in: RoundedRectangle(cornerRadius: Radius.lg, style: Radius.style))
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: Spacing.xxs) {
                 PaneTitle("Face Data")
@@ -476,34 +400,28 @@ private struct FacePane: View {
         if model.setupComplete {
             FaceCard(fill: Theme.good.opacity(0.12), stroke: Theme.good.opacity(0.35)) {
                 HStack(spacing: Spacing.lg) {
-                    FaceIconCircle(
-                        icon: "checkmark.shield.fill", tint: Theme.good, ink: Theme.goodText)
+                    FaceIconCircle(icon: "checkmark.shield.fill", tint: Theme.good, ink: Theme.goodText)
                     VStack(alignment: .leading, spacing: Spacing.xxs) {
-                        Text(
-                            "\(model.enrolledFacesCount) Face ID\(model.enrolledFacesCount == 1 ? "" : "s") Enrolled"
-                        ).font(Typography.sectionTitle)
+                        Text("\(model.enrolledFacesCount) Face ID\(model.enrolledFacesCount == 1 ? "" : "s") Enrolled").font(Typography.sectionTitle)
                         CaptionText("Your face data is securely stored on this Mac.")
                     }
                     Spacer(minLength: 0)
                 }
             }
         } else {
-            FaceActionRow(
-                icon: "person.crop.circle.badge.plus", title: "Not enrolled",
-                caption: "Set up Hey Mac to enroll your face.", tone: .prompt
-            ) { model.openSetup() }
+            FaceActionRow(icon: "person.crop.circle.badge.plus", title: "Not enrolled",
+                          caption: "Set up Hey Mac to enroll your face.", tone: .prompt) { model.openSetup() }
         }
     }
 
     /// Cancel is the default (Return) button; the destructive confirm is second and never the default.
     private func confirmRemoval() {
         let alert = NSAlert()
-        alert.messageText = "Remove your face data?"
-        alert.informativeText =
-            "This deletes your enrolled face, the stored login password and the encryption key and turns off lock-screen face unlock. You can set Hey Mac up again afterwards."
+        alert.messageText = "Remove all face data?"
+        alert.informativeText = "This deletes all enrolled faces, the stored login password and the encryption key and turns off lock-screen face unlock. You can set Hey Mac up again afterwards."
         alert.alertStyle = .warning
         alert.addButton(withTitle: "Cancel")
-        let remove = alert.addButton(withTitle: "Remove")
+        let remove = alert.addButton(withTitle: "Remove All")
         remove.hasDestructiveAction = true
         if alert.runModal() == .alertSecondButtonReturn {
             model.removeAllData()
@@ -518,8 +436,7 @@ private struct AboutPane: View {
     let model: AppModel
 
     private var version: String {
-        (Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String)
-            ?? "1.0.0"
+        (Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String) ?? "1.0.0"
     }
 
     var body: some View {
@@ -528,17 +445,14 @@ private struct AboutPane: View {
         SettingsCard {
             HStack(spacing: Spacing.lg) {
                 ZStack {
-                    RoundedRectangle(cornerRadius: Radius.lg, style: Radius.style).fill(
-                        Theme.accent)
-                    Image(systemName: "faceid").font(.system(size: 22, weight: .semibold))
-                        .foregroundStyle(Theme.accentInk)
+                    RoundedRectangle(cornerRadius: Radius.lg, style: Radius.style).fill(Theme.accent)
+                    Image(systemName: "faceid").font(.system(size: 22, weight: .semibold)).foregroundStyle(Theme.accentInk)
                 }
                 .frame(width: 52, height: 52)
                 .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: Spacing.xs) {
                     Text("Hey Mac").font(.system(size: 16, weight: .bold)).lineLimit(1)
-                    Text("Version \(version)").font(Typography.mono).foregroundStyle(.secondary)
-                        .lineLimit(1)
+                    Text("Version \(version)").font(Typography.mono).foregroundStyle(.secondary).lineLimit(1)
                 }
                 Spacer(minLength: 0)
             }
@@ -548,31 +462,23 @@ private struct AboutPane: View {
         if AppUpdater.shared.isAvailable {
             PaneSection(header: "Updates") {
                 SettingsCard {
-                    FormRow(
-                        title: "Check for updates",
-                        caption: "Hey Mac checks about once a day and asks before installing."
-                    ) {
+                    FormRow(title: "Check for updates", caption: "Hey Mac checks about once a day and asks before installing.") {
                         Button("Check Now") { AppUpdater.shared.checkNow() }
                             .buttonStyle(PillButtonStyle(kind: .secondary))
                             .disabled(!AppUpdater.shared.canCheck)
                     }
                     RowDivider()
-                    switchRow(
-                        "Check automatically",
-                        isOn: Binding(
-                            get: { AppUpdater.shared.checksAutomatically },
-                            set: { AppUpdater.shared.setChecksAutomatically($0) }))
+                    switchRow("Check automatically",
+                              isOn: Binding(get: { AppUpdater.shared.checksAutomatically },
+                                            set: { AppUpdater.shared.setChecksAutomatically($0) }))
                 }
             }
         }
 
         PaneSection(header: "Uninstall") {
             SettingsCard {
-                FormRow(
-                    title: "Uninstall Hey Mac",
-                    caption:
-                        "Removes the app, your face data, saved password and settings from this Mac."
-                ) {
+                FormRow(title: "Uninstall Hey Mac",
+                        caption: "Removes the app, your face data, saved password and settings from this Mac.") {
                     Button("Uninstall…") { confirmUninstall() }
                         .buttonStyle(PillButtonStyle(kind: .danger))
                 }
@@ -584,8 +490,7 @@ private struct AboutPane: View {
     private func confirmUninstall() {
         let alert = NSAlert()
         alert.messageText = "Uninstall Hey Mac?"
-        alert.informativeText =
-            "This deletes your enrolled face, the stored login password, the encryption key, your settings and the app itself, and turns off lock-screen unlock and App Lock. It can't be undone."
+        alert.informativeText = "This deletes your enrolled face, the stored login password, the encryption key, your settings and the app itself, and turns off lock-screen unlock and App Lock. It can't be undone."
         alert.alertStyle = .warning
         alert.addButton(withTitle: "Cancel")
         let remove = alert.addButton(withTitle: "Uninstall")
@@ -596,6 +501,7 @@ private struct AboutPane: View {
     }
 
 }
+
 
 // MARK: - Face Data pieces
 
@@ -608,9 +514,7 @@ private struct FaceCard<Content: View>: View {
             .padding(Spacing.lg)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(fill, in: RoundedRectangle(cornerRadius: Radius.lg, style: Radius.style))
-            .overlay(
-                RoundedRectangle(cornerRadius: Radius.lg, style: Radius.style).stroke(
-                    stroke, lineWidth: 1))
+            .overlay(RoundedRectangle(cornerRadius: Radius.lg, style: Radius.style).stroke(stroke, lineWidth: 1))
     }
 }
 
@@ -657,10 +561,8 @@ private struct FaceActionRow: View {
 
     var body: some View {
         Button(action: action) {
-            FaceCard(
-                fill: tone == .neutral ? Surface.card : tint.opacity(0.10),
-                stroke: tone == .neutral ? Surface.hairline : tint.opacity(0.35)
-            ) {
+            FaceCard(fill: tone == .neutral ? Surface.card : tint.opacity(0.10),
+                     stroke: tone == .neutral ? Surface.hairline : tint.opacity(0.35)) {
                 HStack(spacing: Spacing.lg) {
                     FaceIconCircle(icon: icon, tint: tint, ink: ink)
                     VStack(alignment: .leading, spacing: Spacing.xxs) {
@@ -670,15 +572,11 @@ private struct FaceActionRow: View {
                     }
                     Spacer(minLength: Spacing.sm)
                     if let isExpanded {
-                        Image(systemName: isExpanded ? "chevron.down" : "chevron.right").font(
-                            .system(size: 12, weight: .semibold)
-                        )
-                        .foregroundStyle(.secondary).accessibilityHidden(true)
+                        Image(systemName: isExpanded ? "chevron.down" : "chevron.right").font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(.secondary).accessibilityHidden(true)
                     } else {
-                        Image(systemName: "chevron.right").font(
-                            .system(size: 12, weight: .semibold)
-                        )
-                        .foregroundStyle(.secondary).accessibilityHidden(true)
+                        Image(systemName: "chevron.right").font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(.secondary).accessibilityHidden(true)
                     }
                 }
             }
@@ -698,8 +596,8 @@ private struct PressableCardStyle: ButtonStyle {
     }
 }
 
-extension UnlockAnimationStyle {
-    fileprivate var detail: String {
+private extension UnlockAnimationStyle {
+    var detail: String {
         switch self {
         case .minimal: return "The notch widens just enough for a lock and a small scan."
         case .original: return "A large panel opens with the full scan animation."
@@ -738,13 +636,11 @@ private struct AnimationChoiceRow: View {
     /// A miniature menu-bar strip with the island drawn as it would appear.
     private var thumbnail: some View {
         ZStack(alignment: .top) {
-            RoundedRectangle(cornerRadius: Radius.md, style: Radius.style).fill(
-                Color.primary.opacity(0.08))
+            RoundedRectangle(cornerRadius: Radius.md, style: Radius.style).fill(Color.primary.opacity(0.08))
             switch style {
             case .minimal:
                 HStack {
-                    Image(systemName: "lock.fill").font(.system(size: 8, weight: .semibold))
-                        .foregroundStyle(.white)
+                    Image(systemName: "lock.fill").font(.system(size: 8, weight: .semibold)).foregroundStyle(.white)
                     Spacer(minLength: 0)
                     Image(systemName: "faceid").font(.system(size: 9)).foregroundStyle(Theme.accent)
                 }
@@ -755,9 +651,7 @@ private struct AnimationChoiceRow: View {
             case .original:
                 Image(systemName: "faceid").font(.system(size: 20)).foregroundStyle(Theme.accent)
                     .frame(width: 40, height: 40)
-                    .background(
-                        Color.black, in: RoundedRectangle(cornerRadius: 11, style: .continuous)
-                    )
+                    .background(Color.black, in: RoundedRectangle(cornerRadius: 11, style: .continuous))
                     .padding(.top, 8)
             }
         }

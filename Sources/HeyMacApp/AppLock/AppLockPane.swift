@@ -37,7 +37,7 @@ struct AppLockPane: View {
             }
         }
 
-        PaneSection(footnote: "Choose when each app requires Face ID: when the app opens, after a time limit away (5 or 15 minutes), or periodically while open.") {
+        PaneSection {
             HStack(alignment: .firstTextBaseline) {
                 SectionHeader("Locked apps")
                 Spacer(minLength: Spacing.sm)
@@ -111,7 +111,7 @@ struct AppLockPane: View {
             ForEach(PolicyChoice.allCases) { Text($0.title).tag($0) }
         }
         .labelsHidden().pickerStyle(.menu)
-        .frame(minWidth: 160, idealWidth: 195, maxWidth: 215)
+        .frame(minWidth: 150, idealWidth: 190, maxWidth: 190)
 
         let remove = Button { model.removeLockedApp(app.bundleID) } label: {
             Image(systemName: "minus.circle.fill").font(.title3)
@@ -149,40 +149,35 @@ struct AppLockPane: View {
     }
 }
 
-/// The relock policy presets available to the user.
+/// The three policies as fixed presets; the minute values are the defaults from the spec.
 private enum PolicyChoice: String, CaseIterable, Identifiable {
-    case whenAppOpens, after5Minutes, after15Minutes, every5Minutes, every15Minutes
+    case everyTime, fiveMinutes, fifteenMinutes, focusLoss5
 
     var id: String { rawValue }
 
     init(_ policy: RelockPolicy) {
         switch policy {
-        case .everyTime:
-            self = .whenAppOpens
-        case .afterFocusLossMinutes(let minutes):
-            self = minutes >= 15 ? .after15Minutes : .after5Minutes
-        case .afterMinutes(let minutes):
-            self = minutes >= 15 ? .every15Minutes : .every5Minutes
+        case .everyTime: self = .everyTime
+        case .afterMinutes(let minutes): self = minutes >= 15 ? .fifteenMinutes : .fiveMinutes
+        case .afterFocusLossMinutes: self = .focusLoss5
         }
     }
 
     var title: String {
         switch self {
-        case .whenAppOpens: return "When app opens"
-        case .after5Minutes: return "After 5 minutes"
-        case .after15Minutes: return "After 15 minutes"
-        case .every5Minutes: return "Every 5 min (while open)"
-        case .every15Minutes: return "Every 15 min (while open)"
+        case .everyTime: return "Every time"
+        case .fiveMinutes: return "After 5 minutes"
+        case .fifteenMinutes: return "After 15 minutes"
+        case .focusLoss5: return "5 min after leaving"
         }
     }
 
     var policy: RelockPolicy {
         switch self {
-        case .whenAppOpens: return .everyTime
-        case .after5Minutes: return .afterFocusLossMinutes(5)
-        case .after15Minutes: return .afterFocusLossMinutes(15)
-        case .every5Minutes: return .afterMinutes(5)
-        case .every15Minutes: return .afterMinutes(15)
+        case .everyTime: return .everyTime
+        case .fiveMinutes: return .afterMinutes(5)
+        case .fifteenMinutes: return .afterMinutes(15)
+        case .focusLoss5: return .afterFocusLossMinutes(5)
         }
     }
 }

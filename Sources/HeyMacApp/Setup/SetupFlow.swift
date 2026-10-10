@@ -45,13 +45,15 @@ final class SetupFlow {
     var preview: CGImage?
     private var previewTimer: Timer?
     private var previewSequence = 0
-    
-    private var slotsAddedDuringSetup: Set<Int> = []
-    
+
+    private var initialSlots: Set<Int> = []
+    private var slotsAddedDuringSession: Set<Int> = []
+
     init(model: AppModel, startAt step: Step) {
         self.model = model
         self.step = step
         self.startStep = step
+        self.initialSlots = Set(model.enrolledFaceSlots)
         refreshCameraStatus()
         if step == .enroll || step == .test { startPreview() }
     }
@@ -133,10 +135,12 @@ final class SetupFlow {
         case .rejectedNotLive:
             enrollHint = "Make sure it's your real face, well lit — photos and screens are rejected."
             enrollHintTone = .warn
-        case .finished(let minAgreement, _, let slot):
-            slotsAddedDuringSetup.insert(slot)
+        case .finished(let minAgreement, _):
+            let currentSlots = Set(model.runtime?.pipeline(interactive: true, strictness: .normal)?.enrolledSlots() ?? [])
+            let newlyAdded = currentSlots.subtracting(initialSlots)
+            slotsAddedDuringSession.formUnion(newlyAdded)
             model.reloadSettings()
-            
+
             enrollFinished = true
             enrollHint = String(format: "Saved. Sample agreement: %.2f", minAgreement)
             enrollHintTone = .good
@@ -238,10 +242,10 @@ final class SetupFlow {
             model.reEnroll()
             return
         }
-        for slot in slotsAddedDuringSetup { try? model.runtime?.removeFaceData(at: slot) }
-        slotsAddedDuringSetup.removeAll()
+        for slot in slotsAddedDuringSession { try? model.runtime?.removeFaceData(at: slot) }
+        slotsAddedDuringSession.removeAll()
         model.reloadSettings()
-        
+
         advanceTask?.cancel()
         enrolling = false
         enrollFinished = false
@@ -261,13 +265,11 @@ final class SetupFlow {
     func back() {
         guard canGoBack, let prev = Step(rawValue: step.rawValue - 1) else { return }
         advanceTask?.cancel()
-        
         if prev == .enroll {
-            for slot in slotsAddedDuringSetup { try? model.runtime?.removeFaceData(at: slot) }
-            slotsAddedDuringSetup.removeAll()
+            for slot in slotsAddedDuringSession { try? model.runtime?.removeFaceData(at: slot) }
+            slotsAddedDuringSession.removeAll()
             model.reloadSettings()
         }
-        
         step = prev
         if prev == .enroll || prev == .test { startPreview() } else { stopPreview() }
     }
@@ -291,25 +293,21 @@ final class SetupFlow {
 
     /// Runs whenever the wizard window closes, however it was closed: stops the camera and any pending step.
     func teardown() {
-        print("DEBUG teardown: setupComplete=\(model.setupComplete), slotsAdded=\(slotsAddedDuringSetup)")
         advanceTask?.cancel()
         enrolling = false
         stopPreview()
-        
+
         // If the user didn't finish the wizard normally (setupComplete is still false for
         // first-time setup), roll back any face data captured during this session.
         if !model.setupComplete {
-            for slot in slotsAddedDuringSetup {
-                print("DEBUG teardown: removing slot \(slot)")
+            for slot in slotsAddedDuringSession {
                 try? model.runtime?.removeFaceData(at: slot)
             }
-            slotsAddedDuringSetup.removeAll()
+            slotsAddedDuringSession.removeAll()
             model.reloadSettings()
         }
-        
-        // Always restart the engine so face unlock resumes after the enrollment window closes.
-        // (reEnroll() stopped the engine to free the camera.)
+
+        // Restart engine so face unlock resumes after enrollment closes (reEnroll stopped engine to free camera).
         model.restartEngine()
-        print("DEBUG teardown: done — setupComplete=\(model.setupComplete), faces=\(model.enrolledFacesCount)")
     }
 }

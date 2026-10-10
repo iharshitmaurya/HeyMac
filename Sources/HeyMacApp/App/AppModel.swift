@@ -1,11 +1,11 @@
-import AVFoundation
 import AppKit
 import ApplicationServices
-import HeyMacCore
-import HeyMacEngine
+import AVFoundation
 import Observation
 import ServiceManagement
 import SwiftUI
+import HeyMacCore
+import HeyMacEngine
 
 /// The app's single source of truth: mirrors settings for the UI, owns the engine, and
 /// performs the actions the menu and windows trigger.
@@ -34,7 +34,6 @@ final class AppModel {
     private(set) var animationStyle = UnlockAnimationStyle.saved
     private(set) var animationEnabled = UnlockAnimationStyle.enabled
     private(set) var appLockEnabled = false
-    private(set) var appLockPrivacyLevel = PrivacyLevel.normal
     private(set) var appLockApps: [LockedApp] = []
     private(set) var shieldMode = ShieldMode.saved
     private(set) var accessibilityTrusted = false
@@ -43,26 +42,17 @@ final class AppModel {
     private(set) var lastEvent = "no checks yet"
     private(set) var startupError: String?
     private(set) var unlocksToday = 0
-    private var unlocksTodayKey = ""  // yyyy-MM-dd; a new day resets the count
+    private var unlocksTodayKey = "" // yyyy-MM-dd; a new day resets the count
     var actionError: String?
 
     private init() {
         if Self.uiSnapshotMode {
             // Deterministic sample state for the QA renderer; no runtime, engine, agent, timer or window.
-            let sample =
-                #"[{"bundleID":"net.whatsapp.WhatsApp","name":"\u200EWhatsApp","policy":{"everyTime":{}}},{"bundleID":"com.brave.Browser","name":"Brave Browser","policy":{"afterMinutes":{"_0":5}}},{"bundleID":"com.microsoft.Powerpoint","name":"Microsoft PowerPoint Insider Preview Edition","policy":{"afterFocusLossMinutes":{"_0":5}}},{"bundleID":"com.apple.Notes","name":"Notes","policy":{"afterMinutes":{"_0":15}}}]"#
-            appLockApps =
-                (try? JSONDecoder().decode([LockedApp].self, from: Data(sample.utf8))) ?? []
-            setupComplete = true
-            lockScreenEnabled = true
-            paused = false
-            strictness = .normal
-            unlocksToday = 42
-            launchAtLogin = true
-            accessibilityTrusted = true
-            cameraAuthorized = true
-            appLockEnabled = true
-            appLockPrivacyLevel = .normal
+            let sample = #"[{"bundleID":"net.whatsapp.WhatsApp","name":"\u200EWhatsApp","policy":{"everyTime":{}}},{"bundleID":"com.brave.Browser","name":"Brave Browser","policy":{"afterMinutes":{"_0":5}}},{"bundleID":"com.microsoft.Powerpoint","name":"Microsoft PowerPoint Insider Preview Edition","policy":{"afterFocusLossMinutes":{"_0":5}}},{"bundleID":"com.apple.Notes","name":"Notes","policy":{"afterMinutes":{"_0":15}}}]"#
+            appLockApps = (try? JSONDecoder().decode([LockedApp].self, from: Data(sample.utf8))) ?? []
+            setupComplete = true; lockScreenEnabled = true; paused = false
+            strictness = .normal; unlocksToday = 42; launchAtLogin = true
+            accessibilityTrusted = true; cameraAuthorized = true; appLockEnabled = true
             animationStyle = .minimal
             shieldMode = .fullScreen
             lastEvent = "lock screen unlocked 9:41 AM"
@@ -81,9 +71,7 @@ final class AppModel {
         applyLaunchAtLogin()
         restartEngine()
         AppLockController.shared.faceMatcher = { [weak self] in
-            guard let self, self.setupComplete, !self.paused, let runtime = self.runtime else {
-                return nil
-            }
+            guard let self, self.setupComplete, !self.paused, let runtime = self.runtime else { return nil }
             return runtime.verifier(interactive: false, strictness: self.strictness)
         }
         DispatchQueue.main.async { AppLockController.shared.start() }
@@ -103,12 +91,8 @@ final class AppModel {
         var found: [String] = []
         if setupComplete {
             if !cameraAuthorized { found.append("Camera access is off") }
-            if lockScreenEnabled && !accessibilityTrusted {
-                found.append("Accessibility permission is needed to type at the lock screen")
-            }
-            if lockScreenNeedsPassword {
-                found.append("The stored password was rejected — save it again in Settings")
-            }
+            if lockScreenEnabled && !accessibilityTrusted { found.append("Accessibility permission is needed to type at the lock screen") }
+            if lockScreenNeedsPassword { found.append("The stored password was rejected — save it again in Settings") }
         }
         if let actionError { found.append(actionError) }
         return found
@@ -125,18 +109,15 @@ final class AppModel {
 
     func reloadSettings() {
         setupComplete = settings.setupComplete
-
         let pipeline = runtime?.pipeline(interactive: false, strictness: .normal)
         enrolledFaceSlots = pipeline?.enrolledSlots() ?? []
         enrolledFacesCount = enrolledFaceSlots.count
-
         lockScreenEnabled = settings.lockScreenEnabled
         paused = settings.paused
         lockScreenNeedsPassword = settings.lockScreenNeedsPassword
         strictness = settings.strictness
         launchAtLogin = settings.launchAtLogin
         appLockEnabled = AppLockController.shared.store.enabled
-        appLockPrivacyLevel = AppLockController.shared.store.privacyLevel
         appLockApps = AppLockController.shared.store.apps
     }
 
@@ -167,7 +148,6 @@ final class AppModel {
     func stopEngine() {
         controller?.stop()
         controller = nil
-        EdgeLightController.shared.hide()
     }
 
     func handle(_ event: EngineEvent) {
@@ -178,20 +158,13 @@ final class AppModel {
         case .lockScreenUnlocked:
             lastEvent = "lock screen unlocked \(time)"
             countUnlock()
-            EdgeLightController.shared.hide()
         case .lockScreenPasswordRejected:
             lastEvent = "stored password rejected \(time)"
             lockScreenNeedsPassword = true
-            EdgeLightController.shared.hide()
         case .lockScreenScanEnded:
             lastEvent = "lock screen scan ended \(time)"
-            EdgeLightController.shared.hide()
         case .lockScreenProblem(let reason):
             lastEvent = reason
-            EdgeLightController.shared.hide()
-        case .lockScreenLowLight:
-            lastEvent = "low light detected \(time)"
-            EdgeLightController.shared.show()
         }
         NotchOverlayController.shared.handle(event)
     }
@@ -209,8 +182,7 @@ final class AppModel {
 
     func setLockScreenEnabled(_ enabled: Bool) {
         if enabled, !(runtime?.hasLoginPassword ?? false) {
-            actionError =
-                "Add your login password in Settings › Lock Screen before turning this on."
+            actionError = "Add your login password in Settings › Lock Screen before turning this on."
             SettingsSelection.shared.pane = .lockScreen
             openSettings()
             return
@@ -255,11 +227,6 @@ final class AppModel {
 
     // MARK: - App Lock
 
-    func setAppLockPrivacyLevel(_ level: PrivacyLevel) {
-        AppLockController.shared.store.privacyLevel = level
-        reloadSettings()
-    }
-
     func addLockedApp(_ app: InstalledApp) {
         AppLockController.shared.store.add(bundleID: app.bundleID, name: app.name)
         reloadSettings()
@@ -273,10 +240,7 @@ final class AppModel {
             return
         }
         Task { @MainActor in
-            guard await controller.authorize(reason: "Stop locking this app") else {
-                reloadSettings()
-                return
-            }
+            guard await controller.authorize(reason: "Stop locking this app") else { reloadSettings(); return }
             controller.store.remove(bundleID: bundleID)
             reloadSettings()
         }
@@ -303,10 +267,7 @@ final class AppModel {
             return
         }
         Task { @MainActor in
-            guard await controller.authorize(reason: "Turn off App Lock") else {
-                reloadSettings()
-                return
-            }
+            guard await controller.authorize(reason: "Turn off App Lock") else { reloadSettings(); return }
             controller.store.enabled = false
             controller.stop()
             reloadSettings()
@@ -335,17 +296,13 @@ final class AppModel {
     }
 
     func requestAccessibility() {
-        let options =
-            [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
+        let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
         accessibilityTrusted = AXIsProcessTrustedWithOptions(options)
         if !accessibilityTrusted { openSystemSettings(anchor: "Privacy_Accessibility") }
     }
 
     func openSystemSettings(anchor: String) {
-        guard
-            let url = URL(
-                string: "x-apple.systempreferences:com.apple.preference.security?\(anchor)")
-        else { return }
+        guard let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?\(anchor)") else { return }
         NSWorkspace.shared.open(url)
     }
 
@@ -369,7 +326,6 @@ final class AppModel {
         } catch {
             actionError = "Could not remove face data: \(error)"
         }
-
         reloadSettings()
         if enrolledFacesCount == 0 {
             settings.resetAll()
@@ -422,17 +378,14 @@ final class AppModel {
 
         // Only a real .app (never the bare debug binary's build folder).
         let bundle = Bundle.main.bundleURL
-        let trashed =
-            bundle.pathExtension == "app"
-            && (try? FileManager.default.trashItem(at: bundle, resultingItemURL: nil)) != nil
+        let trashed = bundle.pathExtension == "app" && (try? FileManager.default.trashItem(at: bundle, resultingItemURL: nil)) != nil
         if !trashed && bundle.pathExtension == "app" {
             let alert = NSAlert()
             alert.messageText = "Hey Mac's data is removed"
-            alert.informativeText =
-                "It couldn't move itself to the Trash. Drag Hey Mac from Applications to the Trash to finish."
+            alert.informativeText = "It couldn't move itself to the Trash. Drag Hey Mac from Applications to the Trash to finish."
             alert.runModal()
         }
-        exit(0)  // no orderly quit: nothing may write settings back after they were deleted
+        exit(0) // no orderly quit: nothing may write settings back after they were deleted
     }
 
     func finishSetup() {
@@ -447,22 +400,16 @@ final class AppModel {
 
     func openSetup() {
         let flow = SetupFlow(model: self, startAt: .welcome)
-        windows.show(
-            id: "setup", title: "Set Up Hey Mac", size: CGSize(width: 720, height: 540),
-            resizable: true, minSize: CGSize(width: 640, height: 500),
-            replacing: true, onClose: { flow.teardown() }
-        ) {
+        windows.show(id: "setup", title: "Set Up Hey Mac", size: CGSize(width: 720, height: 540), resizable: true, minSize: CGSize(width: 640, height: 500),
+                     replacing: true, onClose: { flow.teardown() }) {
             SetupWizardView(flow: flow)
         }
     }
 
     func openTest() {
         let flow = SetupFlow(model: self, startAt: .test)
-        windows.show(
-            id: "setup", title: "Test Hey Mac", size: CGSize(width: 720, height: 540),
-            resizable: true, minSize: CGSize(width: 640, height: 500),
-            replacing: true, onClose: { flow.teardown() }
-        ) {
+        windows.show(id: "setup", title: "Test Hey Mac", size: CGSize(width: 720, height: 540), resizable: true, minSize: CGSize(width: 640, height: 500),
+                     replacing: true, onClose: { flow.teardown() }) {
             SetupWizardView(flow: flow)
         }
     }
@@ -473,21 +420,15 @@ final class AppModel {
         // writes to a fresh slot.
         stopEngine()
         let flow = SetupFlow(model: self, startAt: .enroll)
-        windows.show(
-            id: "setup", title: "Enroll Face ID", size: CGSize(width: 720, height: 540),
-            resizable: true, minSize: CGSize(width: 640, height: 500),
-            replacing: true, onClose: { flow.teardown() }
-        ) {
+        windows.show(id: "setup", title: "Enroll Face ID", size: CGSize(width: 720, height: 540), resizable: true, minSize: CGSize(width: 640, height: 500),
+                     replacing: true, onClose: { flow.teardown() }) {
             SetupWizardView(flow: flow)
         }
     }
 
     func openSettings() {
-        windows.show(
-            id: "settings", title: "Hey Mac Settings", size: CGSize(width: 720, height: 560),
-            resizable: true, minSize: CGSize(width: 640, height: 480),
-            autosaveName: "HeyMacSettings"
-        ) {
+        windows.show(id: "settings", title: "Hey Mac Settings", size: CGSize(width: 720, height: 560),
+                     resizable: true, minSize: CGSize(width: 640, height: 480), autosaveName: "HeyMacSettings") {
             SettingsView(model: self)
         }
     }
