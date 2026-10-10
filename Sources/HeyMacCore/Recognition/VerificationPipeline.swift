@@ -27,8 +27,17 @@ public struct FrameEvaluation: Equatable, Sendable {
     public let similarity: Float
     public let isLive: Bool
     public let isMatch: Bool
+    public let brightness: Float
 
     public var accepted: Bool { isLive && isMatch }
+
+    public init(liveness: Float, similarity: Float, isLive: Bool, isMatch: Bool, brightness: Float = 0) {
+        self.liveness = liveness
+        self.similarity = similarity
+        self.isLive = isLive
+        self.isMatch = isMatch
+        self.brightness = brightness
+    }
 }
 
 public final class VerificationPipeline {
@@ -38,6 +47,11 @@ public final class VerificationPipeline {
     private let store: SecureStore
     public let config: PipelineConfig
     static let centroidKey = "face-centroid"
+    static let maxSlots = 3
+
+    static func centroidKey(for slot: Int) -> String {
+        slot == 0 ? centroidKey : "\(centroidKey)-\(slot)"
+    }
 
     public init(
         detector: FaceDetecting = VisionFaceDetector(), embedder: FaceEmbedding_Provider, classifier: LivenessChecking,
@@ -59,14 +73,37 @@ public final class VerificationPipeline {
         return (try embedder.embedding(for: face, in: frame), liveness)
     }
 
-    /// Saves the normalized centroid of `embeddings` as the enrolled identity.
+    /// Saves the normalized centroid of `embeddings` as an enrolled identity in an available slot.
     @discardableResult
     public func saveEnrollment(_ embeddings: [FaceEmbedding]) throws -> FaceEmbedding {
         guard !embeddings.isEmpty else { throw VerificationPipelineError.noImagesProvided }
         let centroid = EmbeddingMath.normalized(EmbeddingMath.centroid(of: embeddings.map(EmbeddingMath.normalized)))
         let data = centroid.vector.withUnsafeBufferPointer { Data(buffer: $0) }
-        try store.save(data, as: Self.centroidKey)
+
+        var targetSlot = 0
+        for i in 0..<Self.maxSlots {
+            let key = Self.centroidKey(for: i)
+            if (try? store.load(key)) == nil {
+                targetSlot = i
+                break
+            }
+            if i == Self.maxSlots - 1 { targetSlot = i }
+        }
+
+        let key = Self.centroidKey(for: targetSlot)
+        try store.save(data, as: key)
         return centroid
+    }
+
+    public func enrolledSlots() -> [Int] {
+        var slots: [Int] = []
+        for i in 0..<Self.maxSlots {
+            let key = Self.centroidKey(for: i)
+            if let stored = try? store.load(key), !stored.isEmpty {
+                slots.append(i)
+            }
+        }
+        return slots
     }
 
     public func enroll(images: [CGImage]) throws {
@@ -74,29 +111,68 @@ public final class VerificationPipeline {
         try saveEnrollment(images.map { try enrollmentSample(from: $0).embedding })
     }
 
-    public func loadEnrolledCentroid() throws -> FaceEmbedding {
-        let stored = try store.load(Self.centroidKey)
-        guard !stored.isEmpty, stored.count % MemoryLayout<Float>.size == 0 else {
+    public func loadEnrolledCentroids() throws -> [FaceEmbedding] {
+        var centroids: [FaceEmbedding] = []
+        var notFoundCount = 0
+        var lastError: Error?
+
+        for i in 0..<Self.maxSlots {
+            let key = Self.centroidKey(for: i)
+            do {
+                let stored = try store.load(key)
+                if !stored.isEmpty, stored.count % MemoryLayout<Float>.size == 0 {
+                    let centroid = stored.withUnsafeBytes { FaceEmbedding(vector: Array($0.bindMemory(to: Float.self))) }
+                    centroids.append(centroid)
+                }
+            } catch SecureStoreError.notFound {
+                notFoundCount += 1
+            } catch {
+                lastError = error
+            }
+        }
+
+        if centroids.isEmpty {
+            if let error = lastError {
+                throw error
+            } else if notFoundCount == Self.maxSlots {
+                throw SecureStoreError.notFound
+            }
             throw VerificationPipelineError.corruptEnrollment
         }
-        return stored.withUnsafeBytes { FaceEmbedding(vector: Array($0.bindMemory(to: Float.self))) }
+        return centroids
     }
 
-    public func evaluate(image: CGImage, against centroid: FaceEmbedding) throws -> FrameEvaluation {
+    public func loadEnrolledCentroid() throws -> FaceEmbedding {
+        guard let first = try loadEnrolledCentroids().first else {
+            throw SecureStoreError.notFound
+        }
+        return first
+    }
+
+    public func evaluate(image: CGImage, against centroids: [FaceEmbedding]) throws -> FrameEvaluation {
         let (face, frame) = try detect(in: image)
         let liveness = try classifier.liveness(for: face, in: frame)
         let candidate = try embedder.embedding(for: face, in: frame)
-        // The centroid comes from disk; a dimension mismatch (corrupt file, other build)
-        // must fail closed rather than trip cosineSimilarity's precondition.
-        let similarity = candidate.vector.count == centroid.vector.count ? EmbeddingMath.cosineSimilarity(centroid, candidate) : -1
+
+        var bestSimilarity: Float = -1
+        for centroid in centroids {
+            let similarity = candidate.vector.count == centroid.vector.count ? EmbeddingMath.cosineSimilarity(centroid, candidate) : -1
+            bestSimilarity = max(bestSimilarity, similarity)
+        }
+
         return FrameEvaluation(
-            liveness: liveness.confidence, similarity: similarity,
-            isLive: isLive(liveness), isMatch: similarity >= config.matchThreshold
+            liveness: liveness.confidence, similarity: bestSimilarity,
+            isLive: isLive(liveness), isMatch: bestSimilarity >= config.matchThreshold,
+            brightness: frame.averageBrightness
         )
     }
 
+    public func evaluate(image: CGImage, against centroid: FaceEmbedding) throws -> FrameEvaluation {
+        try evaluate(image: image, against: [centroid])
+    }
+
     public func verify(image: CGImage) throws -> Bool {
-        try evaluate(image: image, against: loadEnrolledCentroid()).accepted
+        try evaluate(image: image, against: loadEnrolledCentroids()).accepted
     }
 
     private func isLive(_ result: LivenessResult) -> Bool {

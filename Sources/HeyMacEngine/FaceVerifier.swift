@@ -23,6 +23,22 @@ public struct VerificationOutcome: Equatable, Sendable {
 public protocol FaceMatching: AnyObject {
     func run(timeout: TimeInterval, requiredConsecutive: Int, waitForTurn: TimeInterval,
              keepGoing: () -> Bool) -> VerificationOutcome
+    func run(timeout: TimeInterval, requiredConsecutive: Int, waitForTurn: TimeInterval,
+             keepGoing: () -> Bool, onLowLight: (() -> Void)?) -> VerificationOutcome
+}
+
+public extension FaceMatching {
+    func run(timeout: TimeInterval, requiredConsecutive: Int, waitForTurn: TimeInterval,
+             keepGoing: () -> Bool) -> VerificationOutcome {
+        run(timeout: timeout, requiredConsecutive: requiredConsecutive, waitForTurn: waitForTurn,
+            keepGoing: keepGoing, onLowLight: nil)
+    }
+
+    func run(timeout: TimeInterval, requiredConsecutive: Int, waitForTurn: TimeInterval,
+             keepGoing: () -> Bool, onLowLight: (() -> Void)?) -> VerificationOutcome {
+        run(timeout: timeout, requiredConsecutive: requiredConsecutive, waitForTurn: waitForTurn,
+            keepGoing: keepGoing)
+    }
 }
 
 /// Runs a bounded verification window over live camera frames. A match needs
@@ -44,6 +60,14 @@ public final class FaceVerifier: FaceMatching, @unchecked Sendable {
         timeout: TimeInterval, requiredConsecutive: Int = 2, waitForTurn: TimeInterval = 0,
         keepGoing: () -> Bool = { true }
     ) -> VerificationOutcome {
+        run(timeout: timeout, requiredConsecutive: requiredConsecutive, waitForTurn: waitForTurn,
+            keepGoing: keepGoing, onLowLight: nil)
+    }
+
+    public func run(
+        timeout: TimeInterval, requiredConsecutive: Int = 2, waitForTurn: TimeInterval = 0,
+        keepGoing: () -> Bool = { true }, onLowLight: (() -> Void)? = nil
+    ) -> VerificationOutcome {
         var outcome = VerificationOutcome()
         guard sessionLock.lock(before: Date().addingTimeInterval(waitForTurn)) else {
             outcome.failure = "camera busy with another verification"
@@ -51,11 +75,11 @@ public final class FaceVerifier: FaceMatching, @unchecked Sendable {
         }
         defer { sessionLock.unlock() }
 
-        // Load the enrollment before touching the camera: no enrollment or no key access
+        // Load the enrollments before touching the camera: no enrollment or no key access
         // fails instantly, without flashing the camera light.
-        let centroid: FaceEmbedding
+        let centroids: [FaceEmbedding]
         do {
-            centroid = try pipeline.loadEnrolledCentroid()
+            centroids = try pipeline.loadEnrolledCentroids()
         } catch KeychainKeyProviderError.interactionRequired {
             outcome.failure = "keychain access needs approval: open Hey Mac and run the face test"
             return outcome
@@ -78,6 +102,7 @@ public final class FaceVerifier: FaceMatching, @unchecked Sendable {
 
         var lastSequence = 0
         var consecutive = 0
+        var firedLowLight = false
         while Date() < deadline, keepGoing() {
             guard let frame = camera.frame(newerThan: lastSequence) else {
                 Thread.sleep(forTimeInterval: 0.03)
@@ -85,7 +110,11 @@ public final class FaceVerifier: FaceMatching, @unchecked Sendable {
             }
             lastSequence = frame.sequence
             do {
-                let evaluation = try pipeline.evaluate(image: frame.image, against: centroid)
+                let evaluation = try pipeline.evaluate(image: frame.image, against: centroids)
+                if !firedLowLight && evaluation.brightness < 0.28 {
+                    firedLowLight = true
+                    onLowLight?()
+                }
                 outcome.framesEvaluated += 1
                 outcome.bestSimilarity = max(outcome.bestSimilarity, evaluation.similarity)
                 outcome.bestLiveness = max(outcome.bestLiveness, evaluation.liveness)
@@ -95,6 +124,10 @@ public final class FaceVerifier: FaceMatching, @unchecked Sendable {
                     return outcome
                 }
             } catch {
+                if !firedLowLight, frame.image.averageBrightness < 0.28 {
+                    firedLowLight = true
+                    onLowLight?()
+                }
                 outcome.framesWithoutFace += 1
                 consecutive = 0
             }

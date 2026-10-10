@@ -25,11 +25,12 @@ public final class EngineSettings: @unchecked Sendable {
     private enum Key {
         static let setupComplete = "setupComplete"
         static let lockScreenEnabled = "lockScreenEnabled"
+        static let edgeLightEnabled = "edgeLightEnabled"
         static let paused = "paused"
         static let lockScreenNeedsPassword = "lockScreenNeedsPassword"
         static let strictness = "matchStrictness"
         static let launchAtLogin = "launchAtLogin"
-        static let all = [setupComplete, lockScreenEnabled, paused, lockScreenNeedsPassword, strictness, launchAtLogin]
+        static let all = [setupComplete, lockScreenEnabled, edgeLightEnabled, paused, lockScreenNeedsPassword, strictness, launchAtLogin]
     }
 
     private let defaults: UserDefaults
@@ -46,6 +47,11 @@ public final class EngineSettings: @unchecked Sendable {
     public var lockScreenEnabled: Bool {
         get { defaults.bool(forKey: Key.lockScreenEnabled) }
         set { defaults.set(newValue, forKey: Key.lockScreenEnabled) }
+    }
+
+    public var edgeLightEnabled: Bool {
+        get { defaults.object(forKey: Key.edgeLightEnabled) as? Bool ?? true }
+        set { defaults.set(newValue, forKey: Key.edgeLightEnabled) }
     }
 
     public var paused: Bool {

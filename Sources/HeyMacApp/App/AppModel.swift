@@ -23,11 +23,15 @@ final class AppModel {
     private var controller: EngineController?
 
     private(set) var setupComplete = false
+    private(set) var enrolledFacesCount = 0
+    private(set) var enrolledFaceSlots: [Int] = []
+    var isFaceListExpanded = false
     private(set) var lockScreenEnabled = false
     private(set) var paused = false
     private(set) var lockScreenNeedsPassword = false
     private(set) var strictness: MatchStrictness = .normal
     private(set) var launchAtLogin = true
+    private(set) var edgeLightEnabled = true
     private(set) var animationStyle = UnlockAnimationStyle.saved
     private(set) var animationEnabled = UnlockAnimationStyle.enabled
     private(set) var appLockEnabled = false
@@ -106,11 +110,15 @@ final class AppModel {
 
     func reloadSettings() {
         setupComplete = settings.setupComplete
+        let pipeline = runtime?.pipeline(interactive: false, strictness: .normal)
+        enrolledFaceSlots = pipeline?.enrolledSlots() ?? []
+        enrolledFacesCount = enrolledFaceSlots.count
         lockScreenEnabled = settings.lockScreenEnabled
         paused = settings.paused
         lockScreenNeedsPassword = settings.lockScreenNeedsPassword
         strictness = settings.strictness
         launchAtLogin = settings.launchAtLogin
+        edgeLightEnabled = settings.edgeLightEnabled
         appLockEnabled = AppLockController.shared.store.enabled
         appLockApps = AppLockController.shared.store.apps
     }
@@ -142,6 +150,7 @@ final class AppModel {
     func stopEngine() {
         controller?.stop()
         controller = nil
+        EdgeLightController.shared.hide()
     }
 
     func handle(_ event: EngineEvent) {
@@ -152,13 +161,22 @@ final class AppModel {
         case .lockScreenUnlocked:
             lastEvent = "lock screen unlocked \(time)"
             countUnlock()
+            EdgeLightController.shared.hide()
         case .lockScreenPasswordRejected:
             lastEvent = "stored password rejected \(time)"
             lockScreenNeedsPassword = true
+            EdgeLightController.shared.hide()
         case .lockScreenScanEnded:
             lastEvent = "lock screen scan ended \(time)"
+            EdgeLightController.shared.hide()
         case .lockScreenProblem(let reason):
             lastEvent = reason
+            EdgeLightController.shared.hide()
+        case .lockScreenLowLight:
+            lastEvent = "low light detected \(time)"
+            if settings.edgeLightEnabled {
+                EdgeLightController.shared.show(onLockScreen: true)
+            }
         }
         NotchOverlayController.shared.handle(event)
     }
@@ -217,6 +235,19 @@ final class AppModel {
         settings.strictness = value
         reloadSettings()
         restartEngine()
+    }
+
+    func setEdgeLightEnabled(_ enabled: Bool) {
+        settings.edgeLightEnabled = enabled
+        reloadSettings()
+    }
+
+    func previewEdgeLight() {
+        EdgeLightController.shared.show(onLockScreen: false)
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 2_500_000_000)
+            EdgeLightController.shared.hide()
+        }
     }
 
     // MARK: - App Lock
@@ -313,6 +344,25 @@ final class AppModel {
         }
     }
 
+    func removeFaceData(at slot: Int) {
+        stopEngine()
+        do {
+            try runtime?.removeFaceData(at: slot)
+        } catch {
+            actionError = "Could not remove face data: \(error)"
+        }
+        reloadSettings()
+        if enrolledFacesCount == 0 {
+            settings.resetAll()
+            reloadSettings()
+            refreshSystemState()
+            openSetup()
+        } else {
+            restartEngine()
+        }
+        log.write("removed face data at slot \(slot)")
+    }
+
     func removeAllData() {
         stopEngine()
         do {
@@ -390,13 +440,12 @@ final class AppModel {
     }
 
     func reEnroll() {
-        // Verification must not run against a half-written enrollment, and the camera can
-        // only serve one user at a time.
-        settings.setupComplete = false
-        reloadSettings()
+        // The camera can only serve one user at a time, so stop the engine while enrolling.
+        // We do NOT change setupComplete — existing face data is untouched; the new face
+        // writes to a fresh slot.
         stopEngine()
         let flow = SetupFlow(model: self, startAt: .enroll)
-        windows.show(id: "setup", title: "Re-enroll Your Face", size: CGSize(width: 720, height: 540), resizable: true, minSize: CGSize(width: 640, height: 500),
+        windows.show(id: "setup", title: "Enroll Face ID", size: CGSize(width: 720, height: 540), resizable: true, minSize: CGSize(width: 640, height: 500),
                      replacing: true, onClose: { flow.teardown() }) {
             SetupWizardView(flow: flow)
         }
