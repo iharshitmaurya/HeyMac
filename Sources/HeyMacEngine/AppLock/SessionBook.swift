@@ -17,15 +17,22 @@ public final class SessionBook: @unchecked Sendable {
     }
 
     public func unlock(_ bundleID: String, policy: RelockPolicy) {
-        lock.lock(); defer { lock.unlock() }
+        lock.lock()
+        defer { lock.unlock() }
         var expiry: TimeInterval?
         if case .afterMinutes(let minutes) = policy { expiry = now() + Double(minutes) * 60 }
         sessions[bundleID] = Session(policy: policy, expiry: expiry)
     }
 
-    public func isUnlocked(_ bundleID: String) -> Bool {
-        lock.lock(); defer { lock.unlock() }
+    public func isUnlocked(_ bundleID: String, privacyLevel: PrivacyLevel) -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
         guard let session = sessions[bundleID] else { return false }
+        
+        if privacyLevel == .none {
+            return true
+        }
+        
         if let expiry = session.expiry, now() >= expiry {
             sessions[bundleID] = nil
             return false
@@ -33,23 +40,43 @@ public final class SessionBook: @unchecked Sendable {
         return true
     }
 
-    public func focusLost(_ bundleID: String) {
-        lock.lock(); defer { lock.unlock() }
+    public func focusLost(_ bundleID: String, privacyLevel: PrivacyLevel) {
+        lock.lock()
+        defer { lock.unlock() }
         guard var session = sessions[bundleID] else { return }
-        switch session.policy {
-        case .everyTime:
+        
+        switch privacyLevel {
+        case .none:
+            return
+        case .high:
             sessions[bundleID] = nil
-        case .afterFocusLossMinutes(let minutes):
-            session.expiry = now() + Double(minutes) * 60
-            sessions[bundleID] = session
-        case .afterMinutes:
-            break
+            return
+        case .normal:
+            switch session.policy {
+            case .everyTime:
+                sessions[bundleID] = nil
+            case .afterFocusLossMinutes(let minutes):
+                session.expiry = now() + Double(minutes) * 60
+                sessions[bundleID] = session
+            case .afterMinutes:
+                break
+            }
         }
     }
 
-    public func focusGained(_ bundleID: String) {
-        lock.lock(); defer { lock.unlock() }
-        guard var session = sessions[bundleID], case .afterFocusLossMinutes = session.policy else { return }
+    public func focusGained(_ bundleID: String, privacyLevel: PrivacyLevel) {
+        lock.lock()
+        defer { lock.unlock() }
+        guard var session = sessions[bundleID] else { return }
+        
+        if privacyLevel == .none || privacyLevel == .high {
+            return
+        }
+
+        guard case .afterFocusLossMinutes = session.policy else {
+            return
+        }
+        
         if let expiry = session.expiry, now() >= expiry {
             sessions[bundleID] = nil
         } else {
@@ -59,12 +86,14 @@ public final class SessionBook: @unchecked Sendable {
     }
 
     public func revoke(_ bundleID: String) {
-        lock.lock(); defer { lock.unlock() }
+        lock.lock()
+        defer { lock.unlock() }
         sessions[bundleID] = nil
     }
 
     public func revokeAll() {
-        lock.lock(); defer { lock.unlock() }
+        lock.lock()
+        defer { lock.unlock() }
         sessions.removeAll()
     }
 }

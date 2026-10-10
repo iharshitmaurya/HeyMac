@@ -9,6 +9,7 @@ public enum EngineEvent: Equatable, Sendable {
     /// A scan that began with `lockScreenScanning` ended without an unlock result — the indicator must close.
     case lockScreenScanEnded
     case lockScreenProblem(String)
+    case lockScreenLowLight
 
     public var logText: String {
         switch self {
@@ -17,6 +18,7 @@ public enum EngineEvent: Equatable, Sendable {
         case .lockScreenPasswordRejected: return "lock screen: typed password was rejected; auto-typing disabled until it is saved again"
         case .lockScreenScanEnded: return "lock screen: scan ended without unlocking"
         case .lockScreenProblem(let reason): return "lock screen: \(reason)"
+        case .lockScreenLowLight: return "lock screen: low light detected"
         }
     }
 }

@@ -1,5 +1,11 @@
 import Foundation
 
+public enum PrivacyLevel: String, Codable, Equatable, Sendable, CaseIterable {
+    case none = "Low Privacy"
+    case normal = "Standard Privacy"
+    case high = "High Privacy"
+}
+
 public enum RelockPolicy: Codable, Equatable, Sendable {
     /// Locked again as soon as the app loses focus.
     case everyTime
@@ -21,6 +27,8 @@ public final class LockedAppStore: @unchecked Sendable {
     private enum Key {
         static let enabled = "appLock.enabled"
         static let apps = "appLock.apps"
+        static let defaultPolicyMigrated = "appLock.migratedToWhenAppOpens"
+        static let privacyLevel = "appLock.privacyLevel"
     }
 
     private let defaults: UserDefaults
@@ -34,14 +42,42 @@ public final class LockedAppStore: @unchecked Sendable {
         set { defaults.set(newValue, forKey: Key.enabled) }
     }
 
+    public var privacyLevel: PrivacyLevel {
+        get {
+            guard let rawValue = defaults.string(forKey: Key.privacyLevel),
+                  let level = PrivacyLevel(rawValue: rawValue) else {
+                return .normal
+            }
+            return level
+        }
+        set {
+            defaults.set(newValue.rawValue, forKey: Key.privacyLevel)
+        }
+    }
+
     public var apps: [LockedApp] {
         guard let data = defaults.data(forKey: Key.apps),
-              let apps = try? JSONDecoder().decode([LockedApp].self, from: data) else { return [] }
+            var apps = try? JSONDecoder().decode([LockedApp].self, from: data)
+        else { return [] }
+        if !defaults.bool(forKey: Key.defaultPolicyMigrated) {
+            defaults.set(true, forKey: Key.defaultPolicyMigrated)
+            var changed = false
+            apps = apps.map { app in
+                if case .afterMinutes(5) = app.policy {
+                    var m = app
+                    m.policy = .everyTime
+                    changed = true
+                    return m
+                }
+                return app
+            }
+            if changed { save(apps) }
+        }
         return apps
     }
 
     @discardableResult
-    public func add(bundleID: String, name: String, policy: RelockPolicy = .afterMinutes(5)) -> Bool {
+    public func add(bundleID: String, name: String, policy: RelockPolicy = .everyTime) -> Bool {
         guard !AppLockBlacklist.isProtected(bundleID), app(bundleID) == nil else { return false }
         save(apps + [LockedApp(bundleID: bundleID, name: name, policy: policy)])
         return true
@@ -52,11 +88,12 @@ public final class LockedAppStore: @unchecked Sendable {
     }
 
     public func setPolicy(_ policy: RelockPolicy, for bundleID: String) {
-        save(apps.map { app in
-            var app = app
-            if app.bundleID == bundleID { app.policy = policy }
-            return app
-        })
+        save(
+            apps.map { app in
+                var app = app
+                if app.bundleID == bundleID { app.policy = policy }
+                return app
+            })
     }
 
     public func app(_ bundleID: String) -> LockedApp? {

@@ -66,13 +66,27 @@ public final class HeyMacRuntime: @unchecked Sendable {
         try interactiveStore.save(Data(password.utf8), as: StoredItems.loginPassword)
     }
 
-    /// Deletes the enrolled face, the stored password and the encryption key.
     public func removeAllData() throws {
         try removeFile(StoredItems.faceCentroid)
+        try removeFile("\(StoredItems.faceCentroid)-1")
+        try removeFile("\(StoredItems.faceCentroid)-2")
         try removeFile(StoredItems.loginPassword)
         try interactiveKeys.deleteKey()
         interactiveCache.clearCache()
         backgroundCache.clearCache()
+    }
+    
+    public func removeFaceData(at index: Int) throws {
+        let key = index == 0 ? StoredItems.faceCentroid : "\(StoredItems.faceCentroid)-\(index)"
+        try removeFile(key)
+        
+        // If all faces are now deleted, delete the key too!
+        if !fileExists(StoredItems.faceCentroid) && !fileExists("\(StoredItems.faceCentroid)-1") && !fileExists("\(StoredItems.faceCentroid)-2") {
+            try removeFile(StoredItems.loginPassword)
+            try interactiveKeys.deleteKey()
+            interactiveCache.clearCache()
+            backgroundCache.clearCache()
+        }
     }
 
     private func fileExists(_ name: String) -> Bool {

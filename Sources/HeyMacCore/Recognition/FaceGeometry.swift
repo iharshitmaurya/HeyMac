@@ -96,6 +96,20 @@ public struct RGBAImage: Sendable {
         }
         return buffer
     }
+
+    public var averageBrightness: Float {
+        var total: Float = 0
+        let step = 16
+        for y in stride(from: 0, to: height, by: step) {
+            for x in stride(from: 0, to: width, by: step) {
+                let s = (y * width + x) * 4
+                total += Float(bytes[s]) + Float(bytes[s+1]) + Float(bytes[s+2])
+            }
+        }
+        let samples = (height / step) * (width / step)
+        guard samples > 0 else { return 0 }
+        return total / Float(samples * 3 * 255)
+    }
 }
 
 public enum FaceGeometry {
