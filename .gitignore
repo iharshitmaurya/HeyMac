@@ -19,5 +19,4 @@ skills-lock.json
 .env
 
 # Local conversation and design exploration artifacts
-/all-claude-code-chat.md
 /design-preview/
