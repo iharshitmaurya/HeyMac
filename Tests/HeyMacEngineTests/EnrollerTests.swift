@@ -128,3 +128,15 @@ private func makeEnroller(frames: FakeFrames, sampler: FakeSampler, clock: FakeC
     #expect(progress.last == .failed("Enrollment cancelled."))
     #expect(frames.stopped == 1)
 }
+
+@Test func cancellationAfterTheLastSampleDoesNotReplaceEnrollment() {
+    let frames = FakeFrames()
+    let sampler = FakeSampler()
+    var active = true
+    let ok = makeEnroller(frames: frames, sampler: sampler, clock: FakeClock()).run(shouldContinue: { active }) { progress in
+        if case .sampleCaptured(let count, let target, _) = progress, count == target { active = false }
+    }
+    #expect(!ok)
+    #expect(sampler.saved == nil)
+    #expect(frames.stopped == 1)
+}

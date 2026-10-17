@@ -40,6 +40,11 @@ let package = Package(
             resources: [.copy("Fixtures")]
         ),
         .testTarget(
+            name: "HeyMacAppTests",
+            dependencies: ["HeyMacApp", "HeyMacEngine"],
+            swiftSettings: [.swiftLanguageMode(.v5)]
+        ),
+        .testTarget(
             name: "HeyMacEngineTests",
             dependencies: ["HeyMacEngine", "HeyMacCore"],
             swiftSettings: [.swiftLanguageMode(.v5)]

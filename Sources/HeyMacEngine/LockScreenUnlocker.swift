@@ -55,6 +55,7 @@ public enum LockScreenTick: Equatable {
     case typingFailed(String)
     case unlocked
     case passwordRejected
+    case retriesExhausted
 }
 
 /// While the screen is locked and the display is on, looks for the enrolled face and
@@ -65,6 +66,10 @@ public final class LockScreenUnlocker: @unchecked Sendable {
     static let unlockConfirmationDelay: TimeInterval = 5
     static let unlockPollInterval: TimeInterval = 0.15
     static let pollInterval: TimeInterval = 0.25
+    static let noMatchCooldown: TimeInterval = 3.5
+    static let noFaceCooldown: TimeInterval = 1
+    static let scanWindow: TimeInterval = 6
+    static let maxScansPerEpisode = 2
 
     private let matcher: FaceMatching
     private let typist: PasswordTyping
@@ -75,6 +80,7 @@ public final class LockScreenUnlocker: @unchecked Sendable {
     private var running = false
     private var stopRequested = false
     private var attemptedThisEpisode = false
+    private var scansThisEpisode = 0
     private var lastReportedProblem: String?
 
     public init(
@@ -116,11 +122,16 @@ public final class LockScreenUnlocker: @unchecked Sendable {
         guard environment.isLocked() == true else {
             stateLock.withLock {
                 attemptedThisEpisode = false
+                scansThisEpisode = 0
                 lastReportedProblem = nil
             }
             return .notLocked
         }
         if stateLock.withLock({ attemptedThisEpisode }) { return .alreadyAttempted }
+        if stateLock.withLock({ scansThisEpisode }) >= Self.maxScansPerEpisode {
+            if !environment.displayIsAwake() { stateLock.withLock { scansThisEpisode = 0 } }
+            return .retriesExhausted
+        }
         if case .refuse(let reason) = VerificationGate.lockScreen(settings, accessibilityTrusted: environment.accessibilityTrusted()) {
             // Paused / turned off are the user's choice, not problems worth reporting.
             return reason == VerificationGate.accessibilityMissing ? report(reason) : .blocked(reason)
@@ -134,14 +145,27 @@ public final class LockScreenUnlocker: @unchecked Sendable {
             return report("stored password unavailable (\(error))")
         }
 
+        stateLock.withLock { scansThisEpisode += 1 }
         onEvent(.lockScreenScanning)
         let outcome = matcher.run(
-            timeout: 30, requiredConsecutive: 2, waitForTurn: 0,
-            keepGoing: { !self.isStopRequested && !self.settings.paused && self.environment.isLocked() == true && self.environment.displayIsAwake() }
+            timeout: Self.scanWindow, requiredConsecutive: 2, waitForTurn: 0,
+            keepGoing: { self.shouldKeepScanning }
         )
         guard outcome.matched else {
-            onEvent(.lockScreenScanEnded)
-            return outcome.failure.map { report($0) } ?? .noMatch
+            if let failure = outcome.failure {
+                onEvent(.lockScreenScanEnded)
+                return report(failure)
+            }
+            if !shouldKeepScanning {
+                onEvent(.lockScreenScanEnded)
+            } else if outcome.mismatched {
+                onEvent(.lockScreenNoMatch(details: outcome.debugSummary))
+                waitOutAnimation(Self.noMatchCooldown)
+            } else {
+                onEvent(.lockScreenNoFace(details: outcome.debugSummary))
+                waitOutAnimation(Self.noFaceCooldown)
+            }
+            return .noMatch
         }
 
         stateLock.withLock { attemptedThisEpisode = true }
@@ -170,6 +194,18 @@ public final class LockScreenUnlocker: @unchecked Sendable {
         settings.lockScreenNeedsPassword = true
         onEvent(.lockScreenPasswordRejected)
         return .passwordRejected
+    }
+
+    private var shouldKeepScanning: Bool {
+        !isStopRequested && !settings.paused && environment.isLocked() == true && environment.displayIsAwake()
+    }
+
+    private func waitOutAnimation(_ duration: TimeInterval) {
+        var waited: TimeInterval = 0
+        while waited < duration, shouldKeepScanning {
+            environment.sleep(0.25)
+            waited += 0.25
+        }
     }
 
     private func report(_ problem: String) -> LockScreenTick {

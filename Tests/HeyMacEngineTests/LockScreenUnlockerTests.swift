@@ -1,9 +1,10 @@
 import Testing
 import Foundation
+import HeyMacCore
 @testable import HeyMacEngine
 
 private func makeUnlocker(
-    system: FakeSystem, matcher: FakeMatcher, typist: FakeTypist, settings: EngineSettings, recorder: EventRecorder
+    system: FakeSystem, matcher: FakeMatcher, typist: PasswordTyping, settings: EngineSettings, recorder: EventRecorder
 ) -> LockScreenUnlocker {
     LockScreenUnlocker(
         matcher: matcher, typist: typist, settings: settings,
@@ -108,9 +109,54 @@ private struct ThrowingTypist: PasswordTyping {
     func typeAndReturn(_ text: String) throws { throw Failure() }
 }
 
-@Test func aScanThatDoesNotMatchClosesTheIndicator() {
+@Test func aScanWithNoFaceClosesQuietly() {
     let system = FakeSystem()
-    let matcher = FakeMatcher()  // default outcome: matched == false, no failure
+    let matcher = FakeMatcher()
+    let settings = makeTestSettings { $0.lockScreenEnabled = true }
+    let recorder = EventRecorder()
+    let unlocker = makeUnlocker(system: system, matcher: matcher, typist: FakeTypist(system: system, unlocks: true), settings: settings, recorder: recorder)
+
+    #expect(unlocker.tick() == .noMatch)
+    #expect(recorder.events == [.lockScreenScanning, .lockScreenNoFace(details: matcher.outcome.debugSummary)])
+    #expect(system.slept.reduce(0, +) >= LockScreenUnlocker.noFaceCooldown)
+}
+
+@Test func aWrongFaceShowsTheFailure() {
+    let system = FakeSystem()
+    let matcher = FakeMatcher()
+    matcher.outcome.mismatched = true
+    let settings = makeTestSettings { $0.lockScreenEnabled = true }
+    let recorder = EventRecorder()
+    let unlocker = makeUnlocker(system: system, matcher: matcher, typist: FakeTypist(system: system, unlocks: true), settings: settings, recorder: recorder)
+
+    #expect(unlocker.tick() == .noMatch)
+    #expect(recorder.events == [.lockScreenScanning, .lockScreenNoMatch(details: matcher.outcome.debugSummary)])
+    #expect(system.slept.reduce(0, +) >= LockScreenUnlocker.noMatchCooldown)
+}
+
+@Test func scanningStopsAfterOneRetryPerLock() {
+    let system = FakeSystem()
+    let matcher = FakeMatcher()
+    let settings = makeTestSettings { $0.lockScreenEnabled = true }
+    let recorder = EventRecorder()
+    let unlocker = makeUnlocker(system: system, matcher: matcher, typist: FakeTypist(system: system, unlocks: true), settings: settings, recorder: recorder)
+
+    #expect(unlocker.tick() == .noMatch)
+    #expect(unlocker.tick() == .noMatch)
+    #expect(unlocker.tick() == .retriesExhausted)
+    #expect(matcher.callCount == 2)
+
+    system.locked = false
+    #expect(unlocker.tick() == .notLocked)
+    system.locked = true
+    #expect(unlocker.tick() == .noMatch)
+    #expect(matcher.callCount == 3)
+}
+
+@Test func aScanCutShortByAnUnlockJustClosesTheIndicator() {
+    let system = FakeSystem()
+    let matcher = FakeMatcher()
+    matcher.onRun = { system.locked = false }  // unlocked another way while scanning
     let settings = makeTestSettings { $0.lockScreenEnabled = true }
     let recorder = EventRecorder()
     let unlocker = makeUnlocker(system: system, matcher: matcher, typist: FakeTypist(system: system, unlocks: true), settings: settings, recorder: recorder)

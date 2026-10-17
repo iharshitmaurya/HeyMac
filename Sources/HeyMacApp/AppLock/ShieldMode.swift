@@ -10,8 +10,8 @@ enum ShieldMode: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .fullScreen: return "Whole screen"
-        case .appWindowsOnly: return "Only the locked app"
+        case .fullScreen: return "Entire display"
+        case .appWindowsOnly: return "App windows"
         }
     }
 

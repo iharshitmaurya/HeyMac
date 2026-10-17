@@ -19,6 +19,7 @@ final class AppLockController {
     private let watcher = AppWatcher()
     private let system = LocalSystemAuth()
     private var episode: Task<Void, Never>?
+    private var attemptID = UUID()
     private var activeApp: NSRunningApplication?
     private var queue: [NSRunningApplication] = []
     private var justActivatedPID: pid_t?
@@ -97,6 +98,9 @@ final class AppLockController {
     private func begin(_ app: NSRunningApplication) {
         log("begin \(app.bundleIdentifier ?? "?") pid \(app.processIdentifier)")
         activeApp = app
+        shield.model.onUseSystem = { [weak self] in self?.useSystemAuthentication() }
+        shield.model.onStopRecognition = { [weak self] in self?.stopRecognition() }
+        shield.model.faceAvailable = faceMatcher() != nil
         shield.model.onRetry = { [weak self] in self?.retry() }
         shield.model.onQuitApp = { [weak self] in self?.quitActiveApp() }
         shield.present(appName: app.localizedName ?? app.bundleIdentifier ?? "App", icon: app.icon,
@@ -106,30 +110,42 @@ final class AppLockController {
         startAuthentication(for: app)
     }
 
-    private func startAuthentication(for app: NSRunningApplication) {
-        shield.model.phase = .scanning
-        NotchOverlayController.shared.beginScanning(onLockScreen: false)
+    private func startAuthentication(for app: NSRunningApplication, systemOnly: Bool = false) {
+        let attempt = UUID()
+        attemptID = attempt
+        let previous = episode
+        previous?.cancel()
+        let face = systemOnly ? nil : faceMatcher().map { FaceVerifierAuthSource(matcher: $0) }
+        shield.model.faceAvailable = faceMatcher() != nil
+        shield.model.phase = face == nil ? .authenticating : .scanning
+        if face == nil { NotchOverlayController.shared.cancelScanning() }
+        else { NotchOverlayController.shared.beginScanning(onLockScreen: false) }
         episode = Task { [weak self] in
             guard let self else { return }
+            await previous?.value
+            guard !Task.isCancelled, attemptID == attempt, activeApp?.processIdentifier == app.processIdentifier else { return }
             let name = app.localizedName ?? "this app"
-            let outcome = await makeCoordinator().run(reason: "Unlock \(name)")
-            guard !Task.isCancelled, activeApp?.processIdentifier == app.processIdentifier else { return }
-            await finish(app, outcome)
+            let coordinator = AuthCoordinator(face: face, system: system, faceTimeout: 3, onSystemAuthentication: { @MainActor [weak self] in
+                guard let self, !Task.isCancelled, self.attemptID == attempt else { return }
+                self.shield.model.phase = .authenticating
+                NotchOverlayController.shared.cancelScanning()
+            })
+            let outcome = await coordinator.run(reason: "Unlock \(name)")
+            guard !Task.isCancelled, attemptID == attempt, activeApp?.processIdentifier == app.processIdentifier else { return }
+            await finish(app, outcome, attempt: attempt)
         }
     }
 
-    private func finish(_ app: NSRunningApplication, _ outcome: AuthOutcome) async {
+    private func finish(_ app: NSRunningApplication, _ outcome: AuthOutcome, attempt: UUID) async {
         let bid = app.bundleIdentifier ?? "?"
         switch outcome {
         case .unlocked:
             log("finish \(bid): unlocked")
-            if let id = app.bundleIdentifier {
-                sessions.unlock(id, policy: store.app(id)?.policy ?? .afterMinutes(5))
-            }
             NotchOverlayController.shared.finish(success: true)
             shield.model.phase = .unlocked
             try? await Task.sleep(for: .milliseconds(450)) // let the unlock clip start
-            guard activeApp?.processIdentifier == app.processIdentifier else { return }
+            guard !Task.isCancelled, attemptID == attempt, activeApp?.processIdentifier == app.processIdentifier else { return }
+            if let id = app.bundleIdentifier { sessions.unlock(id, policy: store.app(id)?.policy ?? .afterMinutes(5)) }
             log("shield dismissed: unlocked")
             shield.dismiss()
             app.unhide()
@@ -145,6 +161,18 @@ final class AppLockController {
             NotchOverlayController.shared.finish(success: false)
             shield.model.phase = .needsAuth(message)
         }
+    }
+
+    private func useSystemAuthentication() {
+        guard let app = activeApp else { return }
+        startAuthentication(for: app, systemOnly: true)
+    }
+
+    private func stopRecognition() {
+        attemptID = UUID()
+        episode?.cancel()
+        NotchOverlayController.shared.cancelScanning()
+        shield.model.phase = .needsAuth("Face recognition stopped. Use Touch ID or your Mac password, or try again.")
     }
 
     private func retry() {
@@ -165,6 +193,7 @@ final class AppLockController {
     }
 
     private func endEpisode() {
+        attemptID = UUID()
         episode = nil
         activeApp = nil
         if !queue.isEmpty { begin(queue.removeFirst()) }

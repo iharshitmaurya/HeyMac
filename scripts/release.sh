@@ -17,6 +17,13 @@ REPO="iharshitmaurya/HeyMac"
 DMG="$REPO_ROOT/dist/HeyMac-$VERSION.dmg"
 LATEST_DMG="$REPO_ROOT/dist/HeyMac.dmg" # fixed name, so releases/latest/download/HeyMac.dmg always resolves
 APPCAST="$REPO_ROOT/dist/appcast.xml"
+NOTES_MD="$REPO_ROOT/release-notes/$VERSION.md"
+NOTES_HTML="$REPO_ROOT/release-notes/$VERSION.html"
+NOTES_ASSET="$REPO_ROOT/dist/release-notes.html"
+NOTES_ELEMENT=""
+if [ -f "$NOTES_HTML" ]; then
+    NOTES_ELEMENT="<sparkle:releaseNotesLink>https://github.com/$REPO/releases/download/v$VERSION/release-notes.html</sparkle:releaseNotesLink>"
+fi
 SIGN_UPDATE="$REPO_ROOT/.build/artifacts/sparkle/Sparkle/bin/sign_update"
 
 "$SCRIPT_DIR/build-app.sh" "$VERSION"
@@ -25,6 +32,7 @@ echo "Signing the DMG for Sparkle..."
 # Prints: sparkle:edSignature="..." length="..."
 SIGNATURE_ATTRS="$("$SIGN_UPDATE" "$DMG")"
 cp "$DMG" "$LATEST_DMG"
+if [ -f "$NOTES_HTML" ]; then cp "$NOTES_HTML" "$NOTES_ASSET"; fi
 
 cat > "$APPCAST" <<XML
 <?xml version="1.0" encoding="utf-8"?>
@@ -37,6 +45,7 @@ cat > "$APPCAST" <<XML
       <sparkle:version>$VERSION</sparkle:version>
       <sparkle:shortVersionString>$VERSION</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      $NOTES_ELEMENT
       <enclosure url="https://github.com/$REPO/releases/download/v$VERSION/HeyMac-$VERSION.dmg"
                  type="application/x-apple-diskimage" $SIGNATURE_ATTRS />
     </item>
@@ -46,7 +55,12 @@ XML
 echo "Wrote $APPCAST"
 
 if [ "$PUBLISH" = "--publish" ]; then
-    gh release create "v$VERSION" "$DMG" "$LATEST_DMG" "$APPCAST" --repo "$REPO" --title "Hey Mac $VERSION" --generate-notes
+    ASSETS=("$DMG" "$LATEST_DMG" "$APPCAST")
+    NOTES_ARGS=(--generate-notes)
+    if [ -f "$NOTES_HTML" ]; then ASSETS+=("$NOTES_ASSET"); fi
+    if [ -f "$NOTES_MD" ]; then NOTES_ARGS=(--notes-file "$NOTES_MD"); fi
+    gh release create "v$VERSION" "${ASSETS[@]}" --repo "$REPO" --title "Hey Mac $VERSION" \
+        --target "$(git -C "$REPO_ROOT" rev-parse HEAD)" "${NOTES_ARGS[@]}"
     echo "Published v$VERSION"
 
     # Point the Homebrew cask at this release, so `brew install --cask iharshitmaurya/tap/heymac` gets it.

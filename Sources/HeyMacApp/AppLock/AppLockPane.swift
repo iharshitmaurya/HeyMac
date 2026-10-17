@@ -6,7 +6,8 @@ import SwiftUI
 /// View-local state as an `@Observable` class: `@State` needs a macro plugin this
 /// toolchain (Command Line Tools only) doesn't have.
 @MainActor @Observable
-private final class PickerState {
+final class AppPickerState {
+    static let shared = AppPickerState()
     var isOpen = false
     var search = ""
     var installed: [InstalledApp] = []
@@ -20,15 +21,15 @@ private final class PickerState {
 
 struct AppLockPane: View {
     let model: AppModel
-    private let picker = PickerState()
+    private let picker = AppPickerState.shared
 
     var body: some View {
-        PaneTitle("App Lock")
+        PaneTitle("App Lock", subtitle: "Choose which apps to protect and when they relock.")
 
         SettingsCard {
-            FormRow(title: "Lock selected apps",
-                    caption: "Turning this off asks for your face, Touch ID or password first.") {
-                Toggle("Lock selected apps", isOn: Binding(get: { model.appLockEnabled }, set: { model.setAppLockEnabled($0) }))
+            FormRow(title: "Protect selected apps",
+                    caption: model.appStatus.detail) {
+                Toggle("Protect selected apps", isOn: Binding(get: { model.appLockEnabled }, set: { model.setAppLockEnabled($0) }))
                     .labelsHidden().toggleStyle(.switch).tint(Theme.accent)
             }
             if model.appLockEnabled {
@@ -39,7 +40,7 @@ struct AppLockPane: View {
 
         PaneSection {
             HStack(alignment: .firstTextBaseline) {
-                SectionHeader("Locked apps")
+                SectionHeader(model.appLockEnabled ? "Protected apps" : "Selected apps · Protection off")
                 Spacer(minLength: Spacing.sm)
                 if !model.appLockApps.isEmpty { addButton }
             }
@@ -58,13 +59,18 @@ struct AppLockPane: View {
             AppPickerSheet(model: model, picker: picker)
         }
 
-        PaneSection(header: "Shield style") {
+        CaptionText("“When switching to another app” relocks the app. Timed options show when their timer starts.")
+
+        PaneSection(header: "App Lock coverage",
+                    footnote: model.shieldMode == .appWindowsOnly
+                        ? "Content may be briefly visible when app windows move or open."
+                        : "App Lock hides app content. It doesn’t isolate the app or its data from other software.") {
             SettingsCard {
                 VStack(alignment: .leading, spacing: Spacing.md) {
-                    Picker("Shield style", selection: Binding(get: { model.shieldMode }, set: { model.setShieldMode($0) })) {
-                        ForEach(ShieldMode.allCases) { Text($0.title).tag($0) }
+                    ViewThatFits(in: .horizontal) {
+                        HStack(spacing: Spacing.md) { coverageChoice(.fullScreen); coverageChoice(.appWindowsOnly) }
+                        VStack(spacing: Spacing.md) { coverageChoice(.fullScreen); coverageChoice(.appWindowsOnly) }
                     }
-                    .labelsHidden().pickerStyle(.segmented).frame(maxWidth: .infinity)
                     CaptionText(shieldCaption)
                 }
                 .padding(Spacing.lg)
@@ -72,12 +78,31 @@ struct AppLockPane: View {
         }
     }
 
+    private func coverageChoice(_ mode: ShieldMode) -> some View {
+        Button { model.setShieldMode(mode) } label: {
+            VStack(alignment: .leading, spacing: Spacing.sm) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 7).fill(Surface.subtle)
+                    RoundedRectangle(cornerRadius: 4).fill(Theme.accent.opacity(0.15)).frame(width: 65, height: 42)
+                    if mode == .fullScreen { RoundedRectangle(cornerRadius: 7).fill(Color.primary.opacity(0.22)) }
+                    else { RoundedRectangle(cornerRadius: 4).fill(Color.primary.opacity(0.3)).frame(width: 65, height: 42) }
+                    Image(systemName: "lock").foregroundStyle(.primary)
+                }.frame(height: 76).accessibilityHidden(true)
+                Label(mode.title, systemImage: model.shieldMode == mode ? "largecircle.fill.circle" : "circle")
+                    .font(Typography.rowTitle)
+                CaptionText(mode == .fullScreen ? "Cover the display until you unlock." : "Keep the rest of your desktop in view.")
+            }.padding(12).frame(minWidth: 145, maxWidth: .infinity, alignment: .leading)
+                .background(Surface.card, in: RoundedRectangle(cornerRadius: 10))
+                .overlay(RoundedRectangle(cornerRadius: 10).stroke(model.shieldMode == mode ? Theme.accent : Surface.hairline, lineWidth: 1))
+        }.buttonStyle(.plain).accessibilityAddTraits(model.shieldMode == mode ? .isSelected : [])
+    }
+
     private var shieldCaption: String {
         switch model.shieldMode {
         case .fullScreen:
-            return "Covers every display until you unlock; the strongest option."
+            return "Cover the display until you unlock."
         case .appWindowsOnly:
-            return "Blurs just that app's windows and leaves other apps usable. It can lag slightly when you drag the window, and a new window may show for an instant."
+            return "Keep the rest of your desktop in view. Hey Mac blurs the protected app’s windows."
         }
     }
 
@@ -88,8 +113,8 @@ struct AppLockPane: View {
     private var emptyState: some View {
         VStack(spacing: Spacing.sm) {
             Image(systemName: "lock.square").font(.system(size: 28)).foregroundStyle(.secondary).accessibilityHidden(true)
-            Text("No locked apps yet").font(Typography.rowTitle)
-            CaptionText("Choose an app to protect with your face.").multilineTextAlignment(.center)
+            Text("No apps selected yet.").font(Typography.rowTitle)
+            CaptionText("Add an app to get started.").multilineTextAlignment(.center)
             addButton.padding(.top, Spacing.xs)
         }
         .frame(maxWidth: .infinity)
@@ -111,7 +136,7 @@ struct AppLockPane: View {
             ForEach(PolicyChoice.allCases) { Text($0.title).tag($0) }
         }
         .labelsHidden().pickerStyle(.menu)
-        .frame(minWidth: 150, idealWidth: 190, maxWidth: 190)
+        .frame(minWidth: 220, idealWidth: 260, maxWidth: 260)
 
         let remove = Button { model.removeLockedApp(app.bundleID) } label: {
             Image(systemName: "minus.circle.fill").font(.title3)
@@ -165,10 +190,10 @@ private enum PolicyChoice: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .everyTime: return "Every time"
-        case .fiveMinutes: return "After 5 minutes"
-        case .fifteenMinutes: return "After 15 minutes"
-        case .focusLoss5: return "5 min after leaving"
+        case .everyTime: return "When switching to another app"
+        case .fiveMinutes: return "5 minutes after unlocking"
+        case .fifteenMinutes: return "15 minutes after unlocking"
+        case .focusLoss5: return "5 minutes after switching away"
         }
     }
 
@@ -184,7 +209,7 @@ private enum PolicyChoice: String, CaseIterable, Identifiable {
 
 private struct AppPickerSheet: View {
     let model: AppModel
-    let picker: PickerState
+    let picker: AppPickerState
 
     private var results: [InstalledApp] {
         let locked = Set(model.appLockApps.map(\.bundleID))
@@ -196,15 +221,19 @@ private struct AppPickerSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.md) {
-            Text("Choose apps to lock").font(Typography.pageTitle)
-            TextField("Search", text: Binding(get: { picker.search }, set: { picker.search = $0 }))
+            Text("Choose apps to protect").font(.system(size: 20, weight: .semibold))
+            CaptionText("Add one or more apps, then choose Done.")
+            TextField("Find an app", text: Binding(get: { picker.search }, set: { picker.search = $0 }))
                 .textFieldStyle(.roundedBorder)
             if results.isEmpty {
                 VStack(spacing: Spacing.sm) {
                     Image(systemName: "magnifyingglass").font(.system(size: 28)).foregroundStyle(.secondary)
                         .accessibilityHidden(true)
-                    Text("No matching apps").font(Typography.rowTitle)
-                    CaptionText(picker.search.isEmpty ? "Every installed app is already locked." : "Try a different name.")
+                    Text(picker.search.isEmpty ? "No apps available" : "No apps found").font(Typography.rowTitle)
+                    CaptionText(picker.search.isEmpty ? "You’ve added all available apps." : "Try a different search.")
+                    if !picker.search.isEmpty {
+                        Button("Clear Search") { picker.search = "" }.buttonStyle(.plain).foregroundStyle(Theme.accent)
+                    }
                 }
                 .frame(maxWidth: .infinity, minHeight: 240, maxHeight: .infinity)
             } else {
@@ -218,7 +247,7 @@ private struct AppPickerSheet: View {
                                 .accessibilityHidden(true)
                             Text(app.name).lineLimit(1).truncationMode(.tail)
                             Spacer(minLength: Spacing.sm)
-                            Image(systemName: "plus.circle").foregroundStyle(.secondary)
+                            Text("Add").foregroundStyle(Theme.accent)
                         }
                         .contentShape(Rectangle())
                     }
@@ -250,7 +279,7 @@ private func icon(for bundleID: String) -> NSImage {
 /// Snapshot-only: the "Add App" sheet content with a fixed list (read-only scan of /System/Applications).
 @MainActor
 func snapshotAppPickerSheet(model: AppModel) -> some View {
-    let state = PickerState()
+    let state = AppPickerState()
     state.installed = InstalledApps.scan(roots: [URL(fileURLWithPath: "/System/Applications")])
     return AppPickerSheet(model: model, picker: state)
 }
@@ -258,7 +287,7 @@ func snapshotAppPickerSheet(model: AppModel) -> some View {
 /// Snapshot-only: the no-results state.
 @MainActor
 func snapshotAppPickerEmpty(model: AppModel) -> some View {
-    let state = PickerState()
+    let state = AppPickerState()
     state.search = "zzzz"
     return AppPickerSheet(model: model, picker: state)
 }

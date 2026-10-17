@@ -9,7 +9,7 @@ private final class FakeFace: FaceAuthSource, @unchecked Sendable {
     func authenticate(timeout: TimeInterval) async -> FaceAuthResult { calls += 1; return result }
 }
 
-private final class FakeSystem: SystemAuthSource, @unchecked Sendable {
+private final class FakeAuthSystem: SystemAuthSource, @unchecked Sendable {
     var result: SystemAuthResult
     private(set) var calls = 0
     init(_ result: SystemAuthResult) { self.result = result }
@@ -17,7 +17,7 @@ private final class FakeSystem: SystemAuthSource, @unchecked Sendable {
 }
 
 @Test func faceMatchUnlocksWithoutTouchingSystemAuth() async {
-    let face = FakeFace(.matched), system = FakeSystem(.success)
+    let face = FakeFace(.matched), system = FakeAuthSystem(.success)
     let outcome = await AuthCoordinator(face: face, system: system).run(reason: "Unlock Notes")
     #expect(outcome == .unlocked(.face))
     #expect(system.calls == 0)
@@ -25,7 +25,7 @@ private final class FakeSystem: SystemAuthSource, @unchecked Sendable {
 
 @Test func faceMissFallsBackToSystemAuth() async {
     for miss in [FaceAuthResult.noMatch, .unavailable] {
-        let face = FakeFace(miss), system = FakeSystem(.success)
+        let face = FakeFace(miss), system = FakeAuthSystem(.success)
         let outcome = await AuthCoordinator(face: face, system: system).run(reason: "x")
         #expect(outcome == .unlocked(.system))
         #expect(system.calls == 1)
@@ -33,20 +33,20 @@ private final class FakeSystem: SystemAuthSource, @unchecked Sendable {
 }
 
 @Test func noFaceSourceGoesStraightToSystemAuth() async {
-    let system = FakeSystem(.success)
+    let system = FakeAuthSystem(.success)
     let outcome = await AuthCoordinator(face: nil, system: system).run(reason: "x")
     #expect(outcome == .unlocked(.system))
 }
 
 @Test func systemCancelAndFailureAreReported() async {
-    let cancelled = await AuthCoordinator(face: nil, system: FakeSystem(.cancelled)).run(reason: "x")
+    let cancelled = await AuthCoordinator(face: nil, system: FakeAuthSystem(.cancelled)).run(reason: "x")
     #expect(cancelled == .cancelled)
-    let denied = await AuthCoordinator(face: nil, system: FakeSystem(.failed("Wrong password"))).run(reason: "x")
+    let denied = await AuthCoordinator(face: nil, system: FakeAuthSystem(.failed("Wrong password"))).run(reason: "x")
     #expect(denied == .denied("Wrong password"))
 }
 
 @Test func cancelledTaskNeverReachesSystemAuth() async {
-    let face = FakeFace(.noMatch), system = FakeSystem(.success)
+    let face = FakeFace(.noMatch), system = FakeAuthSystem(.success)
     let task = Task {
         withUnsafeCurrentTask { $0?.cancel() }
         return await AuthCoordinator(face: face, system: system).run(reason: "x")
@@ -71,4 +71,32 @@ private final class FakeSystem: SystemAuthSource, @unchecked Sendable {
     let result = await FaceVerifierAuthSource(matcher: matcher).authenticate(timeout: 1)
     #expect(result == .matched)
     #expect(matcher.callCount == 1)
+}
+
+private actor AuthTransitionProbe: SystemAuthSource {
+    var announced = false
+    var announcedBeforeAuthentication = false
+    func announce() { announced = true }
+    func authenticate(reason: String) async -> SystemAuthResult {
+        announcedBeforeAuthentication = announced
+        return .success
+    }
+}
+
+@Test func fallbackAnnouncesSystemAuthenticationBeforePresentingIt() async {
+    let system = AuthTransitionProbe()
+    let coordinator = AuthCoordinator(face: FakeFace(.noMatch), system: system, onSystemAuthentication: { await system.announce() })
+    #expect(await coordinator.run(reason: "Unlock Notes") == .unlocked(.system))
+    #expect(await system.announcedBeforeAuthentication)
+}
+
+@Test func cancellationDuringFallbackTransitionDoesNotPresentAuthentication() async {
+    let system = FakeAuthSystem(.success)
+    let task = Task {
+        await AuthCoordinator(face: nil, system: system, onSystemAuthentication: {
+            withUnsafeCurrentTask { $0?.cancel() }
+        }).run(reason: "Unlock Notes")
+    }
+    #expect(await task.value == .cancelled)
+    #expect(system.calls == 0)
 }

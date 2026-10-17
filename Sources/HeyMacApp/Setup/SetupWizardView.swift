@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 import HeyMacEngine
 
@@ -7,12 +8,12 @@ private enum WZ {
     static let card = Color(light: 0xFFFFFF, dark: 0x2A2A2D)
     static let ctl = Color(light: 0xFFFFFF, dark: 0x3A3A3E)
     static let text2 = Color(light: 0x5F5F66, dark: 0xA9A9B1)
-    static let accent = Color(light: 0x0071E3, dark: 0x0A6FDC)
+    static let accent = Theme.accent
     static let accentPressed = Color(light: 0x0857AD, dark: 0x0B5FBF)
     static let accentTint = Color(light: 0xE4EFFC, dark: 0x1B2E48)
     static let accentText = Color(light: 0x0062C9, dark: 0x62AEFF)
-    static let good = Color(light: 0x17692D, dark: 0x5FD47F)
-    static let goodBg = Color(light: 0xE1F3E6, dark: 0x1F3A29)
+    static let good = Theme.goodText
+    static let goodBg = Theme.good.opacity(0.12)
     static let warn = Color(light: 0x8F5200, dark: 0xFFB340)
     static let warnBg = Color(light: 0xFDEFD6, dark: 0x40311A)
     static let bad = Color(light: 0xB92E26, dark: 0xFF7A70)
@@ -62,7 +63,7 @@ private struct WizardButtonStyle: ButtonStyle {
 struct SetupWizardView: View {
     let flow: SetupFlow
 
-    private static let stepCount = SetupFlow.Step.allCases.count
+    private var stepCount: Int { flow.activeSteps.count }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -74,7 +75,7 @@ struct SetupWizardView: View {
                         .padding(.horizontal, 48)
                         .padding(.vertical, 12)
                         .frame(maxWidth: .infinity, minHeight: geo.size.height,
-                               alignment: flow.step == .features ? .top : .center)
+                               alignment: flow.step == .apps ? .top : .center)
                 }
             }
             Rectangle().fill(WZ.sep).frame(height: 1)
@@ -90,7 +91,9 @@ struct SetupWizardView: View {
         case .camera: camera
         case .enroll: enroll
         case .test: test
-        case .features: features
+        case .accessibility: accessibility
+        case .password: passwordSetup
+        case .apps: appSelection
         case .done: done
         }
     }
@@ -98,17 +101,17 @@ struct SetupWizardView: View {
     // MARK: - Frame
 
     private var header: some View {
-        let index = flow.step.rawValue
+        let index = flow.stepIndex
         return VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 6) {
-                ForEach(0..<Self.stepCount, id: \.self) { i in
+                ForEach(0..<stepCount, id: \.self) { i in
                     Capsule().fill(i <= index ? WZ.accent : WZ.track)
                         .frame(maxWidth: .infinity)
                         .frame(height: 4)
                 }
             }
             .accessibilityHidden(true)
-            Text("Step \(index + 1) of \(Self.stepCount) · \(flow.title)")
+            Text("Step \(index + 1) of \(stepCount) · \(flow.title)")
                 .font(.system(size: 11)).foregroundStyle(WZ.text2).lineLimit(1)
         }
         .padding(.horizontal, 48)
@@ -116,7 +119,7 @@ struct SetupWizardView: View {
         .padding(.bottom, 8)
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("Step \(index + 1) of \(Self.stepCount): \(flow.title)")
+        .accessibilityLabel("Step \(index + 1) of \(stepCount): \(flow.title)")
     }
 
     /// Back on the left; secondary and primary actions on the right. The primary never moves.
@@ -125,8 +128,15 @@ struct SetupWizardView: View {
             if flow.canGoBack {
                 Button("Back") { flow.back() }.buttonStyle(WizardButtonStyle(kind: .secondary))
             }
+            if flow.startStep == .welcome && ![.welcome, .done].contains(flow.step) && !flow.working {
+                Button([.camera, .enroll, .test].contains(flow.step) ? "Finish Setup Later" : "Skip for Now") {
+                    if [.camera, .enroll, .test].contains(flow.step) { flow.finishLater() } else { flow.advance() }
+                }.buttonStyle(.plain).foregroundStyle(WZ.accentText)
+            }
             Spacer(minLength: 12)
-            footerButtons
+            if flow.working {
+                secondary("Cancel") { flow.cancelWork() }
+            } else { footerButtons }
         }
         .padding(.horizontal, 24)
         .padding(.vertical, 16)
@@ -160,18 +170,28 @@ struct SetupWizardView: View {
             } else if flow.testMessage == nil {
                 primary("Test Now") { flow.runTest() }
             } else if flow.testPassed {
-                if flow.model.setupComplete { secondary("Test Again") { flow.runTest() } }
-                primary(flow.model.setupComplete ? "Done" : "Continue") {
-                    flow.model.setupComplete ? flow.close() : flow.advance()
+                if flow.standaloneTest { secondary("Test Again") { flow.runTest() } }
+                primary(flow.standaloneTest ? "Done" : "Continue") {
+                    flow.standaloneTest ? flow.close() : flow.advance()
                 }
             } else {
                 secondary("Re-enroll") { flow.restartEnrollment() }
                 primary("Try Again") { flow.runTest() }
             }
-        case .features:
-            primary("Continue") { flow.continueFromFeatures() }
+        case .accessibility:
+            if flow.model.accessibilityTrusted { primary("Continue") { flow.advance() } }
+            else { primary("Open System Settings") { flow.model.requestAccessibility() } }
+        case .password:
+            if flow.model.hasSavedPassword && !flow.model.lockScreenNeedsPassword {
+                primary("Continue") { flow.advance() }
+            } else {
+                primary("Save Password and Continue") { flow.saveLoginPassword() }
+                    .disabled(flow.password.isEmpty || flow.passwordConfirm.isEmpty)
+            }
+        case .apps:
+            primary("Continue") { flow.advance() }
         case .done:
-            primary("Done") { flow.finish() }
+            primary("Open Settings") { flow.finish() }
         }
     }
 
@@ -266,21 +286,26 @@ struct SetupWizardView: View {
     // MARK: - Steps
 
     private var welcome: some View {
-        VStack(spacing: 8) {
-            Image(systemName: "faceid")
-                .font(.system(size: 44, weight: .regular)).foregroundStyle(WZ.accent)
-                .frame(width: 88, height: 88)
-                .background(WZ.logoTile, in: RoundedRectangle(cornerRadius: 19, style: .continuous))
-                .overlay(RoundedRectangle(cornerRadius: 19, style: .continuous).stroke(Color.primary.opacity(0.1), lineWidth: 1))
-                .accessibilityHidden(true)
-            h1("Welcome to Hey Mac", size: 28).padding(.top, 8)
-            bodyText("Unlock your lock screen and the apps you choose, just by looking at your Mac.")
-            HStack(alignment: .top, spacing: 16) {
-                feature("checkmark.shield", "Stays on your Mac", "Nothing is uploaded.")
-                feature("photo", "No photos kept", "Only a small fingerprint.")
-                feature("bolt.fill", "Quick to set up", "About a minute.")
-            }
-            .frame(maxWidth: 560).padding(.top, 24)
+        VStack(spacing: 16) {
+            Image(nsImage: NSApplication.shared.applicationIconImage).resizable().frame(width: 64, height: 64).accessibilityHidden(true)
+            h1("How would you like to use Hey Mac?", size: 27)
+            bodyText("Choose a starting point. You can enable the other feature later.")
+            VStack(spacing: 8) {
+                ForEach(SetupFlow.Plan.allCases, id: \.self) { plan in
+                    Button { flow.plan = plan } label: {
+                        HStack(spacing: 12) {
+                            Image(systemName: flow.plan == plan ? "largecircle.fill.circle" : "circle")
+                                .foregroundStyle(flow.plan == plan ? Theme.accent : .secondary)
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(plan.rawValue).font(Typography.rowTitle)
+                                CaptionText(plan.detail)
+                            }
+                            Spacer()
+                        }.padding(16).background(WZ.card, in: RoundedRectangle(cornerRadius: 10))
+                            .overlay(RoundedRectangle(cornerRadius: 10).stroke(flow.plan == plan ? Theme.accent : WZ.sep, lineWidth: 1))
+                    }.buttonStyle(.plain).accessibilityAddTraits(flow.plan == plan ? .isSelected : [])
+                }
+            }.frame(maxWidth: 480)
         }
     }
 
@@ -305,7 +330,7 @@ struct SetupWizardView: View {
 
     private var enroll: some View {
         VStack(spacing: 8) {
-            Text("Enroll your face").font(.system(size: 17, weight: .semibold))
+            Text("Set up face recognition").font(.system(size: 17, weight: .semibold))
             enrollRing
             Text(enrollHeadline).font(.system(size: 13, weight: .medium))
                 .foregroundStyle(hintColor).multilineTextAlignment(.center)
@@ -321,7 +346,7 @@ struct SetupWizardView: View {
     }
 
     private var enrollSubline: String {
-        if flow.enrollFinished { return "Your face is saved on this Mac." }
+        if flow.enrollFinished { return "Test recognition to save your face setup. Your existing data stays unchanged until the test succeeds." }
         if flow.enrolling { return "Sample \(min(flow.samplesCaptured + 1, flow.sampleTarget)) of \(flow.sampleTarget). Turn your head slowly." }
         return "We’ll take \(flow.sampleTarget) quick samples in good, even light."
     }
@@ -364,7 +389,7 @@ struct SetupWizardView: View {
     private var test: some View {
         let done = !flow.testing && flow.testMessage != nil
         return VStack(spacing: 8) {
-            Text("Check that it recognizes you").font(.system(size: 17, weight: .semibold))
+            Text("Test Face Recognition").font(.system(size: 17, weight: .semibold))
             ZStack {
                 Circle().stroke(ringColor, lineWidth: 4).frame(width: 186, height: 186)
                 preview(diameter: 170)
@@ -388,15 +413,13 @@ struct SetupWizardView: View {
     private var testHeadline: String {
         if flow.testing { return "Looking for your face…" }
         if flow.testMessage == nil { return "Ready when you are." }
-        return flow.testPassed ? "It’s you!" : "We couldn’t match your face."
+        return flow.testPassed ? "Recognized." : "Face recognition needs attention."
     }
 
     private var testSubline: String {
         if flow.testing { return "Look at the camera." }
         if flow.testMessage == nil { return "Look at the camera, then press Test Now." }
-        return flow.testPassed
-            ? "Hey Mac is working."
-            : "Try facing the camera in better light. If it keeps happening, enroll again."
+        return flow.testMessage ?? "Try face recognition again."
     }
 
     private var testColor: Color {
@@ -404,109 +427,94 @@ struct SetupWizardView: View {
         return flow.testPassed ? WZ.good : WZ.bad
     }
 
-    private var features: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Turn on what you want").font(.system(size: 22, weight: .semibold))
-                Text("You can change any of this later in Settings.")
-                    .font(.system(size: 11)).foregroundStyle(WZ.text2)
-            }
-            VStack(spacing: 0) {
-                lockScreenRow
-                Rectangle().fill(WZ.sep).frame(height: 1)
-                accessibilityRow
-            }
-            .background(WZ.card, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).stroke(WZ.sep, lineWidth: 1))
+    private var accessibility: some View {
+        VStack(spacing: 16) {
+            circleIcon("keyboard", tint: WZ.accentText, bg: WZ.accentTint)
+            h1("Allow Accessibility access.")
+            bodyText("Accessibility lets Hey Mac enter your saved Mac login password after recognizing you. App Lock doesn’t need this permission.")
+            if flow.model.accessibilityTrusted { StatusChip(text: "Allowed", tone: .good) }
+            else { bodyText("Enable Hey Mac in System Settings → Privacy & Security → Accessibility, then return here.") }
         }
     }
 
-    private var lockScreenOn: Bool { flow.model.lockScreenEnabled || flow.lockScreenWanted }
-
-    private var lockScreenRow: some View {
-        VStack(spacing: 0) {
-            HStack(spacing: 12) {
-                tile("lock.fill")
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Unlock the lock screen").font(.system(size: 13, weight: .medium)).lineLimit(1)
-                    Text(flow.passwordMessage ?? "Your face can't unlock a Mac by itself, so Hey Mac types your password for you after it recognizes you. It's stored encrypted on this Mac and never sent anywhere.")
-                        .font(.system(size: 11)).foregroundStyle(passwordMessageColor)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                Spacer(minLength: 8)
-                Toggle("Unlock the lock screen", isOn: Binding(
-                    get: { lockScreenOn },
-                    set: { flow.setLockScreenWanted($0) }
-                ))
-                .toggleStyle(.switch).labelsHidden().tint(WZ.accent)
+    private var passwordSetup: some View {
+        VStack(spacing: 16) {
+            circleIcon("lock", tint: WZ.accentText, bg: WZ.accentTint)
+            h1("Finish Lock Screen Setup")
+            bodyText("Hey Mac enters your saved Mac login password after recognizing you. Verify your identity before saving it. Your Mac password and Touch ID continue to work as usual.")
+            if flow.model.hasSavedPassword && !flow.model.lockScreenNeedsPassword {
+                StatusChip(text: "Password saved", tone: .good)
+            } else {
+                VStack(alignment: .leading, spacing: 12) {
+                    passwordField("Mac login password", text: Binding(get: { flow.password }, set: { flow.password = $0 }))
+                    passwordField("Confirm password", text: Binding(get: { flow.passwordConfirm }, set: { flow.passwordConfirm = $0 }))
+                }.frame(maxWidth: 380)
             }
-            .padding(.horizontal, 16).padding(.vertical, 10).frame(minHeight: 48)
-
-            if flow.lockScreenWanted && !flow.model.lockScreenEnabled {
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack(alignment: .top, spacing: 12) {
-                        passwordField("Login password", text: Binding(get: { flow.password }, set: { flow.password = $0 }))
-                        passwordField("Confirm password", text: Binding(get: { flow.passwordConfirm }, set: { flow.passwordConfirm = $0 }))
-                    }
-                    HStack {
-                        secondary("Save Password") { flow.saveLoginPassword() }
-                            .disabled(flow.password.isEmpty || flow.passwordConfirm.isEmpty)
-                        Spacer(minLength: 0)
-                    }
-                }
-                .padding(.horizontal, 16).padding(.bottom, 12)
-            }
+            if let message = flow.passwordMessage { bodyText(message) }
         }
-    }
-
-    private var passwordMessageColor: Color {
-        guard let message = flow.passwordMessage else { return WZ.text2 }
-        return message == "Password saved." ? WZ.good : WZ.warn
     }
 
     private func passwordField(_ label: String, text: Binding<String>) -> some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(label).font(.system(size: 11)).foregroundStyle(WZ.text2)
-            SecureField("", text: text)
-                .textFieldStyle(.plain).font(.system(size: 13))
-                .padding(.horizontal, 8).frame(height: 28)
-                .background(WZ.ctl, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-                .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).stroke(Color.primary.opacity(0.2), lineWidth: 1))
-                .accessibilityLabel(label)
+            Text(label).font(Typography.caption).foregroundStyle(WZ.text2)
+            SecureField(label, text: text).labelsHidden().textFieldStyle(.roundedBorder).accessibilityLabel(label)
         }
-        .frame(maxWidth: .infinity)
     }
 
-    private var accessibilityRow: some View {
-        HStack(spacing: 12) {
-            tile("keyboard")
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Accessibility").font(.system(size: 13, weight: .medium)).lineLimit(1)
-                Text("Lets Hey Mac press keys on the lock screen.")
-                    .font(.system(size: 11)).foregroundStyle(WZ.text2)
-                    .fixedSize(horizontal: false, vertical: true)
+    private var appSelection: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("Choose Apps to Protect").font(.system(size: 27, weight: .semibold))
+            CaptionText("Select one or more apps. You can set a relock time for each app in Settings.")
+            TextField("Find an app", text: Binding(get: { flow.appSearch }, set: { flow.appSearch = $0 })).textFieldStyle(.roundedBorder)
+            let results = flow.availableApps.filter { flow.appSearch.isEmpty || $0.name.localizedCaseInsensitiveContains(flow.appSearch) }
+            if results.isEmpty {
+                CaptionText("No apps found.")
+                Button("Clear Search") { flow.appSearch = "" }.buttonStyle(.plain).foregroundStyle(Theme.accent)
             }
-            Spacer(minLength: 8)
-            if flow.model.accessibilityTrusted {
-                chip("Allowed", icon: "checkmark", fg: WZ.good, bg: WZ.goodBg)
-            } else {
-                chip("Needs permission", icon: "exclamationmark.triangle.fill", fg: WZ.warn, bg: WZ.warnBg)
-                secondary("Open Settings") { flow.model.requestAccessibility() }
+            ForEach(results) { app in
+                let selected = flow.model.appLockApps.contains { $0.bundleID == app.bundleID }
+                HStack(spacing: 12) {
+                    Image(nsImage: NSWorkspace.shared.icon(forFile: app.url.path)).resizable().frame(width: 30, height: 30).accessibilityHidden(true)
+                    Text(app.name).font(Typography.body).lineLimit(2)
+                    Spacer()
+                    Button(selected ? "Deselect" : "Select") {
+                        if selected { flow.model.removeLockedApp(app.bundleID) } else { flow.model.addLockedApp(app) }
+                    }
+                        .buttonStyle(WizardButtonStyle(kind: .secondary))
+                        .accessibilityLabel(selected ? "\(app.name) selected" : "Select \(app.name)")
+                }.padding(12).background(WZ.card, in: RoundedRectangle(cornerRadius: 10))
             }
         }
-        .padding(.horizontal, 16).padding(.vertical, 10).frame(minHeight: 48)
+    }
+
+    private func readinessRow(_ title: String, _ value: String, ready: Bool) -> some View {
+        HStack {
+            Text(title).font(Typography.body)
+            Spacer()
+            StatusChip(text: value, tone: ready ? .good : .warn)
+        }.padding(12)
     }
 
     private var done: some View {
-        VStack(spacing: 12) {
-            circleIcon("checkmark", tint: WZ.good, bg: WZ.goodBg)
-            h1("You’re set")
-            bodyText("Look at your Mac when you wake the screen. Add apps to lock any time in Settings.")
-            HStack(alignment: .top, spacing: 12) {
-                feature("lock.fill", "Lock screen", "Wake your Mac and look.")
-                feature("lock.app.dashed", "App Lock", "Add apps in Settings.")
-            }
-            .frame(maxWidth: 420).padding(.top, 16)
+        let lockReady = flow.model.setupComplete && flow.model.cameraAuthorized && flow.model.accessibilityTrusted && flow.model.hasSavedPassword && !flow.model.lockScreenNeedsPassword
+        return VStack(spacing: 16) {
+            circleIcon("checklist", tint: WZ.accentText, bg: WZ.accentTint)
+            h1("Here’s what’s ready.", size: 27)
+            bodyText("Review your setup below. Finish any remaining steps in Settings.")
+            VStack(spacing: 0) {
+                readinessRow("Face setup", flow.model.setupComplete ? "Ready" : "Not set up", ready: flow.model.setupComplete)
+                Divider()
+                readinessRow("Recognition check", flow.testPassed ? "Tested" : "Not tested in this setup", ready: flow.testPassed)
+                if flow.startStep == .welcome && flow.wantsLockScreen {
+                    Divider()
+                    readinessRow("Lock Screen", lockReady ? "Ready" : "Setup incomplete", ready: lockReady)
+                }
+                if flow.startStep == .welcome && flow.wantsAppLock {
+                    Divider()
+                    readinessRow("App Lock", flow.model.appLockApps.isEmpty ? "No apps selected" : "\(flow.model.appLockApps.count) apps selected", ready: !flow.model.appLockApps.isEmpty)
+                }
+            }.background(WZ.card, in: RoundedRectangle(cornerRadius: 12))
+            bodyText(flow.startStep == .welcome ? "Ready features turn on when you open Settings. App Lock can also use Touch ID or your Mac password." : "Your updated face setup is saved. Your protection settings stay as you chose them.")
         }
     }
 }

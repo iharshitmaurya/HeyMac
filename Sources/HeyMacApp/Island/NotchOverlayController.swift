@@ -45,8 +45,8 @@ final class NotchOverlayController {
         switch event {
         case .lockScreenScanning: beginScanning()
         case .lockScreenUnlocked: finish(success: true)
-        case .lockScreenPasswordRejected: finish(success: false)
-        case .lockScreenScanEnded: cancelScanning()
+        case .lockScreenPasswordRejected, .lockScreenNoMatch: finish(success: false)
+        case .lockScreenScanEnded, .lockScreenNoFace: cancelScanning()
         default: break
         }
     }

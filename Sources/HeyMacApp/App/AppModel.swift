@@ -38,9 +38,11 @@ final class AppModel {
     private(set) var busy = false
     private(set) var lastEvent = "no checks yet"
     private(set) var startupError: String?
+    private(set) var engineError: String?
     private(set) var unlocksToday = 0
     private var unlocksTodayKey = "" // yyyy-MM-dd; a new day resets the count
     var actionError: String?
+    private(set) var snapshotPasswordSaved = true
 
     private init() {
         if Self.uiSnapshotMode {
@@ -68,18 +70,49 @@ final class AppModel {
         applyLaunchAtLogin()
         restartEngine()
         AppLockController.shared.faceMatcher = { [weak self] in
-            guard let self, self.setupComplete, !self.paused, let runtime = self.runtime else { return nil }
+            guard let self, self.setupComplete, !self.paused, !self.busy, let runtime = self.runtime else { return nil }
             return runtime.verifier(interactive: false, strictness: self.strictness)
         }
         DispatchQueue.main.async { AppLockController.shared.start() }
-        if AppLockController.shared.store.enabled && setupComplete { AppLockAgent.register() }
+        if AppLockController.shared.store.enabled { AppLockAgent.register() }
 
         Timer.scheduledTimer(withTimeInterval: 3, repeats: true) { _ in
             Task { @MainActor in AppModel.shared.refreshSystemState() }
         }
-        if !setupComplete {
+        if !settings.onboardingComplete {
             DispatchQueue.main.async { [self] in openSetup() }
         }
+    }
+
+    /// Sample scenarios are only available in the isolated render process; never touch saved settings.
+    func configureSnapshot(_ scenario: String, apps: [LockedApp]) {
+        precondition(Self.uiSnapshotMode)
+        setupComplete = true; lockScreenEnabled = true; appLockEnabled = true
+        paused = false; busy = false; cameraAuthorized = true; accessibilityTrusted = true
+        lockScreenNeedsPassword = false; snapshotPasswordSaved = true
+        startupError = nil; engineError = nil; actionError = nil; appLockApps = apps
+        for token in scenario.split(separator: "+").map(String.init) {
+        switch token {
+        case "lock-off": lockScreenEnabled = false
+        case "apps-off": appLockEnabled = false
+        case "face-setup": busy = true
+        case "off": lockScreenEnabled = false; appLockEnabled = false
+        case "paused": paused = true
+        case "camera-denied": cameraAuthorized = false
+        case "accessibility-denied": accessibilityTrusted = false
+        case "no-face": setupComplete = false
+        case "empty-apps": appLockApps = []
+        case "password-rejected": lockScreenNeedsPassword = true
+        case "password-missing": snapshotPasswordSaved = false
+        case "engine-error": engineError = "Could not start face unlock. Review face setup."
+        case "apps-only": lockScreenEnabled = false; setupComplete = false
+        default: break
+        }
+        }
+        if scenario == "off" { precondition(lockStatus.label == "Off" && protectionStatus.label == "Off") }
+        if scenario == "paused" { precondition(lockStatus.label == "Paused" && protectionStatus.action == .resume) }
+        if scenario == "empty-apps" { precondition(protectionStatus.tone == .warn && protectionStatus.action == .addApp) }
+        if ["camera-denied", "no-face", "password-rejected", "password-missing", "apps-only", "engine-error"].contains(scenario) { precondition(protectionStatus.tone == .warn) }
     }
 
     // MARK: - Derived state
@@ -96,9 +129,9 @@ final class AppModel {
     }
 
     var menuIconName: String {
-        if startupError != nil || !problems.isEmpty { return "exclamationmark.triangle" }
-        if !setupComplete { return "person.crop.circle.badge.questionmark" }
+        if protectionStatus.tone == .warn { return "exclamationmark.triangle" }
         if paused { return "pause.circle" }
+        if !lockScreenEnabled && !appLockEnabled { return "shield" }
         return "faceid"
     }
 
@@ -124,9 +157,11 @@ final class AppModel {
     // MARK: - Engine
 
     func restartEngine() {
+        if actionError == engineError { actionError = nil }
+        engineError = nil
         controller?.stop()
         controller = nil
-        guard let runtime, settings.setupComplete else { return }
+        guard let runtime, settings.setupComplete, !busy else { return }
         let controller = EngineController(runtime: runtime, settings: settings, log: log) { event in
             Task { @MainActor in AppModel.shared.handle(event) }
         }
@@ -134,7 +169,8 @@ final class AppModel {
             try controller.start()
             self.controller = controller
         } catch {
-            actionError = "Could not start face unlock: \(error)"
+            engineError = "Could not start face unlock: \(error)"
+            actionError = engineError
             log.write(actionError ?? "")
         }
     }
@@ -155,6 +191,10 @@ final class AppModel {
         case .lockScreenPasswordRejected:
             lastEvent = "stored password rejected \(time)"
             lockScreenNeedsPassword = true
+        case .lockScreenNoMatch:
+            lastEvent = "face not recognized \(time)"
+        case .lockScreenNoFace:
+            lastEvent = "no face detected \(time)"
         case .lockScreenScanEnded:
             lastEvent = "lock screen scan ended \(time)"
         case .lockScreenProblem(let reason):
@@ -175,6 +215,17 @@ final class AppModel {
     // MARK: - Actions
 
     func setLockScreenEnabled(_ enabled: Bool) {
+        if !enabled && lockScreenEnabled {
+            Task { @MainActor in
+                guard await authorizeChange("Turn off Lock Screen face unlock") else { return }
+                applyLockScreenEnabled(false)
+            }
+            return
+        }
+        applyLockScreenEnabled(enabled)
+    }
+
+    private func applyLockScreenEnabled(_ enabled: Bool) {
         if enabled, !(runtime?.hasLoginPassword ?? false) {
             actionError = "Add your login password in Settings › Lock Screen before turning this on."
             SettingsSelection.shared.pane = .lockScreen
@@ -277,7 +328,7 @@ final class AppModel {
     private func applyLaunchAtLogin() {
         // Only once the user has finished setup: a half-configured or test build must not
         // register itself to start at login.
-        guard settings.setupComplete else { return }
+        guard settings.onboardingComplete else { return }
         do {
             if settings.launchAtLogin {
                 if SMAppService.mainApp.status != .enabled { try SMAppService.mainApp.register() }
@@ -300,7 +351,18 @@ final class AppModel {
         NSWorkspace.shared.open(url)
     }
 
-    func saveLoginPassword(_ password: String) -> String? {
+    func authorizeChange(_ reason: String) async -> Bool {
+        let result = await LocalSystemAuth().authenticate(reason: reason)
+        guard !Task.isCancelled else { return false }
+        switch result {
+        case .success: actionError = nil; return true
+        case .cancelled: return false
+        case .failed(let message): actionError = message; return false
+        }
+    }
+
+    func saveLoginPassword(_ password: String) async -> String? {
+        guard await authorizeChange("Save your Mac login password in Hey Mac") else { return "Password unchanged. Authenticate to save it." }
         guard let runtime else { return "Face models are not loaded" }
         do {
             try runtime.saveLoginPassword(password)
@@ -314,17 +376,30 @@ final class AppModel {
     }
 
     func removeAllData() {
-        stopEngine()
-        do {
-            try runtime?.removeAllData()
-        } catch {
-            actionError = "Could not remove everything: \(error)"
+        Task { @MainActor in
+            guard await authorizeChange("Remove your face data") else { return }
+            stopEngine()
+            do {
+                guard let runtime else { throw SecureStoreError.notFound }
+                try runtime.removeAllData()
+                settings.setupComplete = false
+                settings.lockScreenEnabled = false
+                settings.lockScreenNeedsPassword = false
+                reloadSettings()
+                refreshSystemState()
+                log.write("face data and saved login password removed; App Lock settings retained")
+            } catch {
+                actionError = "Could not remove face data: \(error)"
+                restartEngine()
+            }
         }
-        settings.resetAll()
+    }
+
+    func beginFaceSetup() { busy = true; stopEngine() }
+    func endFaceSetup() { busy = false; restartEngine() }
+    func acceptFaceSetup() {
+        settings.setupComplete = true
         reloadSettings()
-        refreshSystemState()
-        log.write("removed face data and settings")
-        openSetup()
     }
 
     /// Removes everything Hey Mac put on this Mac (face data, password, Keychain key, settings, log, login
@@ -364,7 +439,7 @@ final class AppModel {
     }
 
     func finishSetup() {
-        settings.setupComplete = true
+        settings.onboardingComplete = true
         reloadSettings()
         applyLaunchAtLogin()
         restartEngine()
@@ -390,20 +465,19 @@ final class AppModel {
     }
 
     func reEnroll() {
-        // Verification must not run against a half-written enrollment, and the camera can
-        // only serve one user at a time.
-        settings.setupComplete = false
-        reloadSettings()
-        stopEngine()
-        let flow = SetupFlow(model: self, startAt: .enroll)
-        windows.show(id: "setup", title: "Re-enroll Your Face", size: CGSize(width: 720, height: 540), resizable: true, minSize: CGSize(width: 640, height: 500),
-                     replacing: true, onClose: { flow.teardown() }) {
-            SetupWizardView(flow: flow)
+        Task { @MainActor in
+            guard await authorizeChange("Replace your face data") else { return }
+            beginFaceSetup()
+            let flow = SetupFlow(model: self, startAt: .enroll)
+            windows.show(id: "setup", title: "Set Up Your Face Again", size: CGSize(width: 720, height: 620), resizable: true, minSize: CGSize(width: 640, height: 500),
+                         replacing: true, onClose: { flow.teardown() }) {
+                SetupWizardView(flow: flow)
+            }
         }
     }
 
     func openSettings() {
-        windows.show(id: "settings", title: "Hey Mac Settings", size: CGSize(width: 720, height: 560),
+        windows.show(id: "settings", title: "Hey Mac Settings", size: CGSize(width: 900, height: 640),
                      resizable: true, minSize: CGSize(width: 640, height: 480), autosaveName: "HeyMacSettings") {
             SettingsView(model: self)
         }

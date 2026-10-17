@@ -29,7 +29,7 @@ Hey Mac bridges the gap between iOS-level convenience and macOS security, bringi
 *   🌫️ **Adaptive Privacy Blurs:** Choose your obfuscation level. Blur the entire display for maximum privacy, or strictly blur the locked application window to maintain workflow context.
 *   ⏱️ **Intelligent Relock Policies:** Granular control per application. Require authentication immediately upon launch, after a set duration (5-15 mins), or gracefully lock after you switch focus away from the app.
 *   🏝️ **Dynamic Notch Island:** A fluid, native-feeling UI drops down from the macOS notch, providing instant visual feedback during biometric scans.
-*   🧑‍🚀 **Frictionless Onboarding:** A polished 6-step setup wizard guides you through camera permissions, facial enrollment, testing, and security preferences.
+*   🧑‍🚀 **Frictionless Onboarding:** Choose Lock Screen, App Lock, or both, then follow the setup steps needed for those features.
 
 ---
 
@@ -58,6 +58,6 @@ Security is not an afterthought; it is the foundation of Hey Mac. This applicati
 
 > **100% On-Device Processing:** All facial recognition is handled locally by the Apple Neural Engine via Core ML. **No data ever leaves your machine.**
 
-*   **Zero Photo Storage:** Hey Mac does not save images of your face. It generates a mathematical, numeric embedding of your facial structure, encrypted securely within the native **macOS Keychain**.
-*   **Advanced Anti-Spoofing:** Built-in liveness detection ensures a physical, three-dimensional human is present. It actively rejects photographs, screens, or printed masks.
-*   **Quit Protection:** If Hey Mac is securing an app, quitting the app requires biometric authentication. A persistent background launch agent ensures the security layer cannot be bypassed by force-quitting the process.
+*   **Zero Photo Storage:** Hey Mac does not save images of your face. It generates a mathematical, numeric embedding of your facial structure, stored encrypted on this Mac, with its encryption key protected by **macOS Keychain**.
+*   **Anti-Spoofing:** A built-in liveness check helps reject photos and screens held up to the camera. Hey Mac uses your Mac's regular camera, not a depth sensor like Face ID on iPhone, so keep a strong password.
+*   **Quit Protection:** If Hey Mac is securing an app, quitting the app requires biometric authentication. A background launch agent can restart Hey Mac after unexpected termination.

@@ -20,11 +20,13 @@ public struct AuthCoordinator: Sendable {
     private let face: FaceAuthSource?
     private let system: SystemAuthSource
     private let faceTimeout: TimeInterval
+    private let onSystemAuthentication: @Sendable () async -> Void
 
-    public init(face: FaceAuthSource?, system: SystemAuthSource, faceTimeout: TimeInterval = 3) {
+    public init(face: FaceAuthSource?, system: SystemAuthSource, faceTimeout: TimeInterval = 3, onSystemAuthentication: @escaping @Sendable () async -> Void = {}) {
         self.face = face
         self.system = system
         self.faceTimeout = faceTimeout
+        self.onSystemAuthentication = onSystemAuthentication
     }
 
     public func run(reason: String) async -> AuthOutcome {
@@ -32,6 +34,8 @@ public struct AuthCoordinator: Sendable {
         if let face, await face.authenticate(timeout: faceTimeout) == .matched {
             return .unlocked(.face)
         }
+        if Task.isCancelled { return .cancelled }
+        await onSystemAuthentication()
         if Task.isCancelled { return .cancelled }
         switch await system.authenticate(reason: reason) {
         case .success: return .unlocked(.system)

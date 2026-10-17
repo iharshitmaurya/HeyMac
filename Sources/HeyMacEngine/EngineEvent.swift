@@ -6,6 +6,8 @@ public enum EngineEvent: Equatable, Sendable {
     case lockScreenScanning
     case lockScreenUnlocked(summary: String)
     case lockScreenPasswordRejected
+    case lockScreenNoMatch(details: String)
+    case lockScreenNoFace(details: String)
     /// A scan that began with `lockScreenScanning` ended without an unlock result — the indicator must close.
     case lockScreenScanEnded
     case lockScreenProblem(String)
@@ -15,6 +17,8 @@ public enum EngineEvent: Equatable, Sendable {
         case .lockScreenScanning: return "lock screen: scanning"
         case .lockScreenUnlocked(let summary): return "lock screen: unlocked (\(summary))"
         case .lockScreenPasswordRejected: return "lock screen: typed password was rejected; auto-typing disabled until it is saved again"
+        case .lockScreenNoMatch(let details): return "lock screen: no matching face (\(details))"
+        case .lockScreenNoFace(let details): return "lock screen: no face seen (\(details))"
         case .lockScreenScanEnded: return "lock screen: scan ended without unlocking"
         case .lockScreenProblem(let reason): return "lock screen: \(reason)"
         }

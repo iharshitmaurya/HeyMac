@@ -82,3 +82,15 @@ final class CountingKeyProvider: SymmetricKeyProviding {
     #expect(first == second)
     #expect(second == third)
 }
+
+@Test func replacingStoredDataIsAtomicAndKeepsPrivatePermissions() throws {
+    let directory = makeTempDirectory()
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let store = SecureStore(keyProvider: FakeKeyProvider(), directory: directory)
+    try store.save(Data("old enrollment".utf8), as: "identity")
+    try store.save(Data("verified replacement".utf8), as: "identity")
+    #expect(try store.load("identity") == Data("verified replacement".utf8))
+    let attributes = try FileManager.default.attributesOfItem(atPath: directory.appendingPathComponent("identity").path)
+    #expect((attributes[.posixPermissions] as? NSNumber)?.intValue == 0o600)
+    #expect(try FileManager.default.contentsOfDirectory(atPath: directory.path) == ["identity"])
+}

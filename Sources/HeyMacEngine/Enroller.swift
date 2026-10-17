@@ -98,6 +98,10 @@ public final class Enroller {
             }
         }
 
+        guard shouldContinue() else {
+            onProgress(.failed("Enrollment cancelled."))
+            return false
+        }
         do {
             let centroid = try sampler.saveEnrollment(samples)
             let agreement = samples.map { EmbeddingMath.cosineSimilarity(centroid, $0) }

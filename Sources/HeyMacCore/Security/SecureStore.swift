@@ -1,5 +1,6 @@
 import Foundation
 import CryptoKit
+import Darwin
 
 public enum SecureStoreError: Error, Equatable {
     case encryptionFailed
@@ -40,9 +41,8 @@ public final class SecureStore {
         ) else {
             throw SecureStoreError.encryptionFailed
         }
-        do {
-            _ = try FileManager.default.replaceItemAt(url, withItemAt: tempURL)
-        } catch {
+        // rename atomically installs a new item as well as replacing an existing one.
+        guard rename(tempURL.path, url.path) == 0 else {
             try? FileManager.default.removeItem(at: tempURL)
             throw SecureStoreError.encryptionFailed
         }

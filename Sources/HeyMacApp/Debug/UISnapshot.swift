@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import HeyMacEngine
 
 /// Hidden QA mode (`HeyMac --render-ui <dir>`): renders the real screens to PNG in light and dark,
 /// hosted in an off-screen NSWindow, using sample state from `AppModel.uiSnapshotMode`.
@@ -23,8 +24,8 @@ enum UISnapshot {
         try? FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
         let model = AppModel.shared
 
-        let paneNames = ["status", "lockscreen", "applock", "face", "about"]
-        let settingsSizes = [(640, 480), (680, 520), (820, 620), (1000, 760)]
+        let paneNames = ["overview", "lockscreen", "applock", "yourface", "appearance", "about"]
+        let settingsSizes = [(640, 480), (900, 640), (1000, 760)]
         for (i, pane) in paneNames.enumerated() {
             for (w, h) in settingsSizes {
                 each { SettingsView(model: model, initialPaneIndex: i) }
@@ -32,11 +33,24 @@ enum UISnapshot {
             }
         }
 
-        let stepNames = ["welcome", "camera", "enroll", "test", "features", "done"]
+        let sampleApps = model.appLockApps
+        for scenario in ["off", "paused", "camera-denied", "no-face", "empty-apps", "password-rejected", "password-missing", "apps-only", "engine-error"] {
+            model.configureSnapshot(scenario, apps: sampleApps)
+            for (index, name) in [(0, "overview"), (1, "lockscreen")] {
+                each { SettingsView(model: model, initialPaneIndex: index) }
+                    render: { snap($0, screen: "state-\(scenario)-\(name)", size: (900, 640), dark: $1) }
+            }
+            each { MenuContent(model: model) }
+                render: { snap($0, screen: "state-\(scenario)-menu", size: (302, nil), dark: $1) }
+        }
+        model.configureSnapshot("ready", apps: sampleApps)
+
+        let stepNames = ["welcome", "camera", "enroll", "test", "accessibility", "password", "apps", "done"]
         for step in SetupFlow.Step.allCases {
             for (w, h) in [(720, 540), (900, 700)] {
                 each { () -> SetupWizardView in
                     let flow = SetupFlow(model: model, startAt: step)
+                    flow.availableApps = InstalledApps.scan(roots: [URL(fileURLWithPath: "/System/Applications")])
                     flow.cameraAuthorized = true
                     flow.cameraDenied = false
                     return SetupWizardView(flow: flow)
@@ -51,7 +65,7 @@ enum UISnapshot {
         each { snapshotAppPickerSheet(model: model) } render: { snap($0, screen: "applock-picker", size: (380, nil), dark: $1) }
         each { snapshotAppPickerEmpty(model: model) } render: { snap($0, screen: "applock-picker-empty", size: (380, 340), dark: $1) }
 
-        for (name, phase) in [("scanning", ShieldModel.Phase.scanning), ("needsauth", .needsAuth("Face not recognized. Try again or quit the app."))] {
+        for (name, phase) in [("scanning", ShieldModel.Phase.scanning), ("authenticating", .authenticating), ("needsauth", .needsAuth("Face not recognized. Try again or quit the app."))] {
             each { () -> AnyView in
                 let shield = ShieldModel()
                 shield.appName = "WhatsApp"

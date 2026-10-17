@@ -1,11 +1,9 @@
 import SwiftUI
 
-/// Color tokens shared by the menu, settings and wizard — one accent and semantic
-/// status colors. Matches the "Hey Mac, redrawn" interface concept: a single soft blue
-/// accent, flat fills, no gradients or glow shadows.
+/// Color tokens shared by the menu, settings and wizard.
 enum Theme {
-    static let accent = Color(hex: 0x6C93E8)
-    static let accentInk = Color(hex: 0x0D1A33)
+    static let accent = Color(hex: 0x0071E3)
+    static let accentInk = Color.white
     static let good = Color(hex: 0x59C77E)
     static let warn = Color(hex: 0xE3A93C)
     static let bad = Color(hex: 0xEF6F5E)
@@ -51,13 +49,16 @@ enum Typography {
     static let sectionTitle = Font.system(size: 13, weight: .semibold)
     static let rowTitle = Font.system(size: 13, weight: .semibold)
     static let body = Font.system(size: 13, weight: .regular)
-    static let caption = Font.system(size: 11.5, weight: .regular)
+    static let caption = Font.system(size: 13, weight: .regular)
     static let mono = Font.system(size: 11, weight: .medium, design: .monospaced)
 }
 
 enum Surface {
-    static let card = Color.primary.opacity(0.05)
-    static let hairline = Color.primary.opacity(0.12)
+    static let background = Color(light: 0xFFFFFF, dark: 0x242428)
+    static let sidebar = Color(light: 0xF6F5F8, dark: 0x202024)
+    static let subtle = Color(light: 0xF6F6F8, dark: 0x2E2E33)
+    static let card = background
+    static let hairline = Color(light: 0xE9E9ED, dark: 0x3B3B42)
     /// Divider leading inset == row label inset.
     static let rowInset: CGFloat = Spacing.lg
 }
@@ -106,9 +107,10 @@ struct PillButtonStyle: ButtonStyle {
                 .padding(.vertical, 7)
                 .background(background)
                 .foregroundStyle(foreground)
-                .clipShape(Capsule())
+                .frame(minHeight: 36)
+                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                 .overlay(
-                    Capsule().stroke(stroke, lineWidth: 1)
+                    RoundedRectangle(cornerRadius: 8, style: .continuous).stroke(stroke, lineWidth: 1)
                 )
                 .opacity(isEnabled ? (pressed ? 0.85 : 1) : 0.45)
         }
@@ -139,7 +141,7 @@ struct PillButtonStyle: ButtonStyle {
     }
 }
 
-/// A small status chip — colored dot plus label, used for "Installed", "Needs setup", etc.
+/// A compact status badge — colored dot plus label.
 struct StatusChip: View {
     enum Tone { case good, warn, bad, idle
         var color: Color {
@@ -159,10 +161,10 @@ struct StatusChip: View {
             Circle().fill(tone.color).frame(width: 6, height: 6)
             Text(text)
         }
-        .font(.system(size: 10.5, weight: .medium, design: .monospaced))
+        .font(.system(size: 11, weight: .medium))
         .padding(.horizontal, 9)
-        .padding(.vertical, 3)
+        .padding(.vertical, 4)
         .background(tone.color.opacity(0.16))
-        .clipShape(Capsule())
+        .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
     }
 }

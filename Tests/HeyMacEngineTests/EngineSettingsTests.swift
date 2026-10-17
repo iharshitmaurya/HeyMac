@@ -32,3 +32,21 @@ import Foundation
     settings.lockScreenNeedsPassword = true
     #expect(VerificationGate.lockScreen(settings, accessibilityTrusted: true) == .refuse(VerificationGate.passwordRejected))
 }
+
+@Test func setupCanFinishWithoutEnrollingAFace() {
+    let settings = EngineSettings(defaults: UserDefaults(suiteName: "setup-plan-\(UUID().uuidString)")!)
+    #expect(!settings.onboardingComplete)
+    settings.onboardingComplete = true
+    #expect(settings.onboardingComplete)
+    #expect(!settings.setupComplete)
+    settings.resetAll()
+    #expect(!settings.onboardingComplete)
+}
+
+@Test func existingEnrolledUsersHaveCompletedOnboarding() {
+    let settings = makeTestSettings()
+    #expect(settings.onboardingComplete)
+    settings.onboardingComplete = true
+    settings.setupComplete = false
+    #expect(settings.onboardingComplete)
+}

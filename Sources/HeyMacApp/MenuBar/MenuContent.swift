@@ -37,13 +37,15 @@ struct MenuContent: View {
                 .padding(.bottom, Spacing.md)
             }
             divider
-            toggleRow("Unlock the lock screen", icon: "lock.fill", isOn: model.lockScreenEnabled) { model.setLockScreenEnabled($0) }
+            toggleRow("Lock Screen", caption: lockScreenStatus, icon: "lock", isOn: model.lockScreenEnabled) { model.setLockScreenEnabled($0) }
                 .disabled(!model.setupComplete)
-            toggleRow("Pause", icon: "pause.circle", isOn: paused) { model.setPaused($0) }
-                .disabled(!model.setupComplete)
+            toggleRow("App Lock", caption: appLockStatus, icon: "square.grid.2x2", isOn: model.appLockEnabled) { model.setAppLockEnabled($0) }
             divider
-            if !model.setupComplete {
-                actionRow("Set Up Hey Mac…", icon: "person.crop.circle.badge.plus", shortcut: nil) { model.openSetup() }
+            if let title = model.protectionStatus.actionTitle, model.protectionStatus.action != .resume {
+                actionRow(title, icon: "arrow.forward.circle", shortcut: nil) { model.perform(model.protectionStatus.action) }
+            }
+            if model.setupComplete {
+                actionRow(paused ? "Resume face recognition" : "Pause face recognition", icon: paused ? "play.circle" : "pause.circle", shortcut: nil) { model.setPaused(!paused) }
             }
             actionRow("Settings…", icon: "gearshape", shortcut: "⌘,") { model.openSettings() }
             if AppUpdater.shared.isAvailable {
@@ -51,10 +53,11 @@ struct MenuContent: View {
                     .disabled(!AppUpdater.shared.canCheck)
             }
             divider
-            actionRow("Quit Hey Mac", icon: "rectangle.portrait.and.arrow.right", shortcut: "⌘Q", iconTint: Theme.badText) { NSApplication.shared.terminate(nil) }
+            actionRow("Quit Hey Mac", icon: "rectangle.portrait.and.arrow.right", shortcut: "⌘Q") { NSApplication.shared.terminate(nil) }
         }
         .padding(.bottom, Spacing.sm)
         .frame(width: 302)
+        .background(Color(light: 0xFFFFFF, dark: 0x242428))
     }
 
     private var divider: some View {
@@ -65,58 +68,29 @@ struct MenuContent: View {
 
     private var header: some View {
         HStack(spacing: Spacing.md) {
-            ZStack {
-                Circle().fill(avatarFill)
-                Image(systemName: statusGlyph)
-                    .font(.system(size: 18, weight: .semibold))
-                    .foregroundStyle(avatarInk)
-            }
-            .frame(width: 44, height: 44)
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(statusTitle).font(.system(size: 14, weight: .semibold)).lineLimit(1)
-                Text(model.lastEvent).font(Typography.caption).foregroundStyle(.secondary)
-                    .lineLimit(1).truncationMode(.tail)
-            }
-            Spacer(minLength: Spacing.xs)
-            if model.setupComplete {
-                VStack(alignment: .trailing, spacing: 0) {
-                    Text("\(model.unlocksToday)").font(.system(size: 15, weight: .semibold).monospacedDigit())
-                    Text("today").font(.system(size: 10.5)).foregroundStyle(.secondary)
+            Image(nsImage: NSApplication.shared.applicationIconImage)
+                .resizable().scaledToFit().frame(width: 38, height: 38)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Hey Mac").font(.system(size: 14, weight: .semibold))
+                HStack(spacing: 5) {
+                    Circle().fill(statusTint).frame(width: 6, height: 6)
+                        .accessibilityHidden(true)
+                    Text(statusTitle).font(Typography.caption)
+                        .foregroundStyle(.secondary)
                 }
-                .accessibilityElement(children: .ignore)
-                .accessibilityLabel("\(model.unlocksToday) unlocks today")
             }
+            Spacer(minLength: 0)
         }
         .padding(.horizontal, Spacing.lg)
-        .padding(.top, Spacing.md + 2)
+        .padding(.top, Spacing.lg)
         .padding(.bottom, Spacing.md)
     }
 
-    private var avatarFill: Color {
-        if attention { return Theme.warn }
-        if !model.setupComplete || paused { return Color.primary.opacity(0.14) }
-        return Theme.accent
-    }
-
-    private var avatarInk: Color {
-        if attention { return Theme.accentInk }
-        if !model.setupComplete || paused { return .primary.opacity(0.75) }
-        return Theme.accentInk
-    }
-
-    private var statusGlyph: String {
-        if attention { return "exclamationmark" }
-        if !model.setupComplete { return "questionmark" }
-        if paused { return "pause.fill" }
-        return "checkmark"
-    }
-
-    private var statusTitle: String {
-        if !model.setupComplete { return "Not Set Up Yet" }
-        if paused { return "Hey Mac Is Paused" }
-        return "Hey Mac Is On"
-    }
+    private var statusTint: Color { model.protectionStatus.tone == .warn ? Theme.warnText : model.protectionStatus.tone == .good ? Theme.goodText : .secondary }
+    private var statusTitle: String { previewPaused == true ? "Face recognition is paused." : previewProblems?.isEmpty == false ? "Needs attention" : model.protectionStatus.title }
+    private var lockScreenStatus: String { previewPaused == true ? "Face recognition paused" : model.lockStatus.label }
+    private var appLockStatus: String { model.appStatus.tone == .good ? "\(model.appLockApps.count) apps protected" : model.appStatus.label }
 
     private func iconView(_ name: String, tint: Color? = nil) -> some View {
         Image(systemName: name)
@@ -126,11 +100,15 @@ struct MenuContent: View {
             .frame(width: Self.iconCol, alignment: .center)
     }
 
-    private func toggleRow(_ label: String, icon: String, isOn: Bool, action: @escaping (Bool) -> Void) -> some View {
+    private func toggleRow(_ label: String, caption: String, icon: String, isOn: Bool, action: @escaping (Bool) -> Void) -> some View {
         HoverRow(id: label) {
             HStack(spacing: Spacing.md) {
                 iconView(icon)
-                Text(label).font(Typography.body).lineLimit(1).truncationMode(.tail)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(label).font(Typography.body).lineLimit(1)
+                    Text(caption).font(Typography.caption).foregroundStyle(.secondary)
+                        .lineLimit(2).fixedSize(horizontal: false, vertical: true)
+                }
                 Spacer(minLength: Spacing.sm)
                 Toggle(label, isOn: Binding(get: { isOn }, set: action))
                     .labelsHidden()
@@ -138,9 +116,11 @@ struct MenuContent: View {
                     .controlSize(.small)
                     .tint(Theme.accent)
                     .accessibilityLabel(label)
+                    .accessibilityValue("\(isOn ? "On" : "Off"), \(caption)")
             }
             .padding(.horizontal, Spacing.md)
-            .frame(height: Self.rowHeight)
+            .padding(.vertical, Spacing.sm)
+            .frame(minHeight: 52)
         }
     }
 

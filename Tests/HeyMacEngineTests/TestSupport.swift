@@ -32,11 +32,13 @@ func matchedOutcome() -> VerificationOutcome {
 
 final class FakeMatcher: FaceMatching {
     var outcome = VerificationOutcome()
+    var onRun: (() -> Void)?
     private(set) var callCount = 0
 
     func run(timeout: TimeInterval, requiredConsecutive: Int, waitForTurn: TimeInterval,
              keepGoing: () -> Bool) -> VerificationOutcome {
         callCount += 1
+        onRun?()
         return outcome
     }
 }

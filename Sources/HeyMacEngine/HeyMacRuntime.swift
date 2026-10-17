@@ -60,6 +60,18 @@ public final class HeyMacRuntime: @unchecked Sendable {
         Enroller(frames: camera, sampler: pipeline(interactive: true, strictness: .normal), sessionLock: sessionLock)
     }
 
+    /// A private encrypted staging store: a failed or cancelled replacement never overwrites
+    /// the enrolled identity used by the background engine.
+    public func makeEnrollmentSession(strictness: MatchStrictness) -> EnrollmentSession {
+        let directory = supportDirectory.appendingPathComponent(".enrollment-\(UUID().uuidString)", isDirectory: true)
+        let store = SecureStore(keyProvider: interactiveCache, directory: directory)
+        let pipeline = VerificationPipeline(embedder: embedder, classifier: classifier, store: store,
+                                            config: PipelineConfig(matchThreshold: strictness.threshold))
+        return EnrollmentSession(directory: directory, store: store, destination: interactiveStore,
+                                 enroller: Enroller(frames: camera, sampler: pipeline, sessionLock: sessionLock),
+                                 verifier: FaceVerifier(camera: camera, pipeline: pipeline, sessionLock: sessionLock))
+    }
+
     public var hasLoginPassword: Bool { fileExists(StoredItems.loginPassword) }
 
     public func saveLoginPassword(_ password: String) throws {
@@ -84,4 +96,24 @@ public final class HeyMacRuntime: @unchecked Sendable {
         guard FileManager.default.fileExists(atPath: url.path) else { return }
         try FileManager.default.removeItem(at: url)
     }
+}
+
+/// Kept alive by any worker using it; its staging files are removed only after workers finish.
+public final class EnrollmentSession: @unchecked Sendable {
+    private let directory: URL
+    private let store: SecureStore
+    private let destination: SecureStore
+    public let enroller: Enroller
+    public let verifier: FaceVerifier
+
+    init(directory: URL, store: SecureStore, destination: SecureStore, enroller: Enroller, verifier: FaceVerifier) {
+        self.directory = directory; self.store = store; self.destination = destination
+        self.enroller = enroller; self.verifier = verifier
+    }
+
+    public func commit() throws {
+        try destination.save(store.load(StoredItems.faceCentroid), as: StoredItems.faceCentroid)
+    }
+
+    deinit { try? FileManager.default.removeItem(at: directory) }
 }

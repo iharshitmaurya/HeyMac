@@ -9,8 +9,18 @@ public struct VerificationOutcome: Equatable, Sendable {
     public var bestSimilarity: Float = -1
     public var bestLiveness: Float = 0
     public var failure: String?
+    public var mismatched = false
+    public var wrongFaceFrames = 0
+    public var longestWrongStreak = 0
+    public var matchThreshold: Float = 0
 
     public init() {}
+
+    public var debugSummary: String {
+        String(format: "faceFrames=%d noFaceFrames=%d wrongFaceFrames=%d longestWrongStreak=%d/%d bestSimilarity=%.3f threshold=%.2f bestLiveness=%.3f",
+               framesEvaluated, framesWithoutFace, wrongFaceFrames, longestWrongStreak, FaceVerifier.mismatchFrames,
+               bestSimilarity, matchThreshold, bestLiveness)
+    }
 
     public var summary: String {
         if let failure { return "FAIL (\(failure))" }
@@ -33,6 +43,7 @@ public final class FaceVerifier: FaceMatching, @unchecked Sendable {
     private let camera: FrameSource
     private let pipeline: VerificationPipeline
     private let sessionLock: NSLock
+    static let mismatchFrames = 6
 
     public init(camera: FrameSource, pipeline: VerificationPipeline, sessionLock: NSLock = NSLock()) {
         self.camera = camera
@@ -77,7 +88,9 @@ public final class FaceVerifier: FaceMatching, @unchecked Sendable {
         defer { camera.stop() }
 
         var lastSequence = 0
+        outcome.matchThreshold = pipeline.config.matchThreshold
         var consecutive = 0
+        var wrongStreak = 0
         while Date() < deadline, keepGoing() {
             guard let frame = camera.frame(newerThan: lastSequence) else {
                 Thread.sleep(forTimeInterval: 0.03)
@@ -90,13 +103,21 @@ public final class FaceVerifier: FaceMatching, @unchecked Sendable {
                 outcome.bestSimilarity = max(outcome.bestSimilarity, evaluation.similarity)
                 outcome.bestLiveness = max(outcome.bestLiveness, evaluation.liveness)
                 consecutive = evaluation.accepted ? consecutive + 1 : 0
+                wrongStreak = evaluation.isMatch ? 0 : wrongStreak + 1
+                if !evaluation.isMatch { outcome.wrongFaceFrames += 1 }
+                outcome.longestWrongStreak = max(outcome.longestWrongStreak, wrongStreak)
                 if consecutive >= requiredConsecutive {
                     outcome.matched = true
+                    return outcome
+                }
+                if wrongStreak >= Self.mismatchFrames {
+                    outcome.mismatched = true
                     return outcome
                 }
             } catch {
                 outcome.framesWithoutFace += 1
                 consecutive = 0
+                wrongStreak = 0
             }
         }
         return outcome

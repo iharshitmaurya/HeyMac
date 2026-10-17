@@ -23,19 +23,25 @@ public enum MatchStrictness: String, CaseIterable, Sendable {
 /// Non-secret preferences. Secrets (enrollment, login password) stay in SecureStore.
 public final class EngineSettings: @unchecked Sendable {
     private enum Key {
+        static let onboardingComplete = "onboardingComplete"
         static let setupComplete = "setupComplete"
         static let lockScreenEnabled = "lockScreenEnabled"
         static let paused = "paused"
         static let lockScreenNeedsPassword = "lockScreenNeedsPassword"
         static let strictness = "matchStrictness"
         static let launchAtLogin = "launchAtLogin"
-        static let all = [setupComplete, lockScreenEnabled, paused, lockScreenNeedsPassword, strictness, launchAtLogin]
+        static let all = [onboardingComplete, setupComplete, lockScreenEnabled, paused, lockScreenNeedsPassword, strictness, launchAtLogin]
     }
 
     private let defaults: UserDefaults
 
     public init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
+    }
+
+    public var onboardingComplete: Bool {
+        get { defaults.object(forKey: Key.onboardingComplete) as? Bool ?? setupComplete }
+        set { defaults.set(newValue, forKey: Key.onboardingComplete) }
     }
 
     public var setupComplete: Bool {

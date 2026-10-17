@@ -15,3 +15,9 @@ my-asset/
 brag-output*/
 skills-lock.json
 .brag_d*
+
+.env
+
+# Local conversation and design exploration artifacts
+/all-claude-code-chat.md
+/design-preview/
