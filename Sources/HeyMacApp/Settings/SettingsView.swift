@@ -169,24 +169,21 @@ private struct StatusPane: View {
         PaneTitle("Overview", subtitle: "See what’s working and what needs attention.")
 
         SettingsCard(tinted: statusTone != .idle, tint: statusTone == .warn ? Theme.warn : Theme.good) {
-            HStack(spacing: Spacing.lg) {
-                ZStack {
-                    Circle().fill(statusTone == .good ? Theme.good.opacity(0.14) : statusTone == .warn ? Theme.warn.opacity(0.14) : Surface.subtle)
-                    Image(systemName: statusIcon)
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(statusTone == .good ? Theme.goodText : statusTone == .warn ? Theme.warnText : .secondary)
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: Spacing.lg) {
+                    statusIconView
+                    statusText
+                        .layoutPriority(1)
+                    Spacer(minLength: Spacing.sm)
+                    StatusChip(text: statusLabel, tone: statusTone)
                 }
-                .frame(width: 48, height: 48)
-                .accessibilityHidden(true)
-
-                VStack(alignment: .leading, spacing: Spacing.xs) {
-                    Text(statusTitle).font(.system(size: 20, weight: .semibold))
-                    Text(statusSubtitle).font(Typography.body).foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
+                VStack(alignment: .leading, spacing: Spacing.md) {
+                    HStack(spacing: Spacing.lg) {
+                        statusIconView
+                        statusText
+                    }
+                    StatusChip(text: statusLabel, tone: statusTone)
                 }
-                .layoutPriority(1)
-                Spacer(minLength: Spacing.sm)
-                StatusChip(text: statusLabel, tone: statusTone)
             }
             .padding(Spacing.lg)
             if let actionTitle {
@@ -266,6 +263,25 @@ private struct StatusPane: View {
     private var appLockStatusLabel: String { model.appStatus.label }
     private var appLockStatusTone: StatusChip.Tone { model.appStatus.tone }
     private var appLockCaption: String { model.appStatus.detail }
+
+    private var statusIconView: some View {
+        ZStack {
+            Circle().fill(statusTone == .good ? Theme.good.opacity(0.14) : statusTone == .warn ? Theme.warn.opacity(0.14) : Surface.subtle)
+            Image(systemName: statusIcon)
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(statusTone == .good ? Theme.goodText : statusTone == .warn ? Theme.warnText : .secondary)
+        }
+        .frame(width: 48, height: 48)
+        .accessibilityHidden(true)
+    }
+
+    private var statusText: some View {
+        VStack(alignment: .leading, spacing: Spacing.xs) {
+            Text(statusTitle).font(.system(size: 20, weight: .semibold))
+            Text(statusSubtitle).font(Typography.body).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
 
     private func manageRow(title: String, caption: String, status: String, tone: StatusChip.Tone, pane: SettingsPane) -> some View {
         FormRow(title: title, caption: caption, chip: StatusChip(text: status, tone: tone)) {
@@ -362,24 +378,53 @@ private struct LockScreenPane: View {
 
     private var passwordForm: some View {
         VStack(alignment: .leading, spacing: Spacing.md) {
-            HStack(spacing: Spacing.md) {
-                VStack(alignment: .leading, spacing: Spacing.xxs) {
-                    Text("Saved password").font(Typography.rowTitle)
-                    CaptionText(hasPassword ? "Encrypted on this Mac." : "Required for Lock Screen face unlock.")
-                    if hasPassword, !form.isChanging, let message = form.message {
-                        Text(message).font(Typography.caption).foregroundStyle(Theme.goodText)
-                    }
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .center, spacing: Spacing.md) {
+                    passwordSummary.layoutPriority(1)
+                    Spacer(minLength: Spacing.sm)
+                    passwordActions
                 }
-                Spacer(minLength: Spacing.sm)
-                StatusChip(text: hasPassword ? "Saved" : "Not saved", tone: hasPassword ? .good : .warn)
-                if hasPassword, !form.isChanging {
-                    Button("Update Saved Password…") { form.isChanging = true; form.message = nil }
-                        .buttonStyle(PillButtonStyle(kind: .secondary))
+                VStack(alignment: .leading, spacing: Spacing.sm) {
+                    passwordSummary
+                    passwordActions
                 }
             }
             if !hasPassword || form.isChanging { fields }
         }
         .padding(Spacing.lg)
+    }
+
+    private var passwordSummary: some View {
+        VStack(alignment: .leading, spacing: Spacing.xxs) {
+            Text("Saved password").font(Typography.rowTitle)
+            CaptionText(hasPassword ? "Encrypted on this Mac." : "Required for Lock Screen face unlock.")
+            if hasPassword, !form.isChanging, let message = form.message {
+                Text(message).font(Typography.caption).foregroundStyle(Theme.goodText)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    @ViewBuilder private var passwordActions: some View {
+        if hasPassword, !form.isChanging {
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: Spacing.md) {
+                    StatusChip(text: "Saved", tone: .good)
+                    updatePasswordButton
+                }
+                VStack(alignment: .leading, spacing: Spacing.sm) {
+                    StatusChip(text: "Saved", tone: .good)
+                    updatePasswordButton
+                }
+            }
+        } else {
+            StatusChip(text: "Not saved", tone: .warn)
+        }
+    }
+
+    private var updatePasswordButton: some View {
+        Button("Update Saved Password…") { form.isChanging = true; form.message = nil }
+            .buttonStyle(PillButtonStyle(kind: .secondary))
     }
 
     @ViewBuilder private var fields: some View {

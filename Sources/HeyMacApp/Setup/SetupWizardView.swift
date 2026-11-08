@@ -488,11 +488,18 @@ struct SetupWizardView: View {
     }
 
     private func readinessRow(_ title: String, _ value: String, ready: Bool) -> some View {
-        HStack {
-            Text(title).font(Typography.body)
-            Spacer()
-            StatusChip(text: value, tone: ready ? .good : .warn)
-        }.padding(12)
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: Spacing.md) {
+                Text(title).font(Typography.body).layoutPriority(1)
+                Spacer(minLength: Spacing.sm)
+                StatusChip(text: value, tone: ready ? .good : .warn)
+            }
+            VStack(alignment: .leading, spacing: Spacing.xs) {
+                Text(title).font(Typography.body)
+                StatusChip(text: value, tone: ready ? .good : .warn)
+            }
+        }
+        .padding(12)
     }
 
     private var done: some View {
