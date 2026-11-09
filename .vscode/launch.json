@@ -1,0 +1,24 @@
+{
+  "configurations": [
+    {
+      "type": "swift",
+      "request": "launch",
+      "args": [],
+      "cwd": "${workspaceFolder:HeyMac}",
+      "name": "Debug HeyMac",
+      "target": "HeyMac",
+      "configuration": "debug",
+      "preLaunchTask": "swift: Build Debug HeyMac"
+    },
+    {
+      "type": "swift",
+      "request": "launch",
+      "args": [],
+      "cwd": "${workspaceFolder:HeyMac}",
+      "name": "Release HeyMac",
+      "target": "HeyMac",
+      "configuration": "release",
+      "preLaunchTask": "swift: Build Release HeyMac"
+    }
+  ]
+}

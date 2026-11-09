@@ -119,3 +119,50 @@ func makePipeline(
     embedder.nextEmbedding = FaceEmbedding(vector: [1, 0, 0, 0, 0])
     #expect(try pipeline.verify(image: makeDummyImage()) == false)
 }
+
+@Test func multiFaceEnrollmentSavesUpToThreeSlotsAndTracksSlots() throws {
+    let embedder = FakeEmbedder()
+    let pipeline = makePipeline(embedder: embedder)
+
+    embedder.nextEmbedding = FaceEmbedding(vector: [1, 0, 0])
+    let (_, slot0) = try pipeline.saveEnrollment([embedder.nextEmbedding])
+    #expect(slot0 == 0)
+    #expect(pipeline.enrolledSlots() == [0])
+
+    embedder.nextEmbedding = FaceEmbedding(vector: [0, 1, 0])
+    let (_, slot1) = try pipeline.saveEnrollment([embedder.nextEmbedding])
+    #expect(slot1 == 1)
+    #expect(pipeline.enrolledSlots() == [0, 1])
+
+    embedder.nextEmbedding = FaceEmbedding(vector: [0, 0, 1])
+    let (_, slot2) = try pipeline.saveEnrollment([embedder.nextEmbedding])
+    #expect(slot2 == 2)
+    #expect(pipeline.enrolledSlots() == [0, 1, 2])
+
+    let centroids = try pipeline.loadEnrolledCentroids()
+    #expect(centroids.count == 3)
+}
+
+@Test func evaluatingAgainstMultipleCentroidsMatchesAnyEnrolledFace() throws {
+    let embedder = FakeEmbedder()
+    let pipeline = makePipeline(embedder: embedder)
+
+    let faceA = FaceEmbedding(vector: [1, 0, 0])
+    let faceB = FaceEmbedding(vector: [0, 1, 0])
+    let faceC = FaceEmbedding(vector: [0, 0, 1])
+
+    try pipeline.saveEnrollment([faceA])
+    try pipeline.saveEnrollment([faceB])
+
+    // Candidate matches face A
+    embedder.nextEmbedding = faceA
+    #expect(try pipeline.verify(image: makeDummyImage()) == true)
+
+    // Candidate matches face B
+    embedder.nextEmbedding = faceB
+    #expect(try pipeline.verify(image: makeDummyImage()) == true)
+
+    // Candidate matches neither face A nor face B
+    embedder.nextEmbedding = faceC
+    #expect(try pipeline.verify(image: makeDummyImage()) == false)
+}

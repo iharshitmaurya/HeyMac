@@ -43,10 +43,10 @@ private final class FakeSampler: EnrollmentSampling {
     }
 
     @discardableResult
-    func saveEnrollment(_ embeddings: [FaceEmbedding]) throws -> FaceEmbedding {
+    func saveEnrollment(_ embeddings: [FaceEmbedding]) throws -> (embedding: FaceEmbedding, slot: Int) {
         if let saveError { throw saveError }
         saved = embeddings
-        return EmbeddingMath.normalized(EmbeddingMath.centroid(of: embeddings))
+        return (EmbeddingMath.normalized(EmbeddingMath.centroid(of: embeddings)), 0)
     }
 }
 
@@ -71,7 +71,7 @@ private func makeEnroller(frames: FakeFrames, sampler: FakeSampler, clock: FakeC
     #expect(ok)
     #expect(sampler.saved?.count == 3)
     #expect(progress.first == .sampleCaptured(count: 1, target: 3, liveness: 0.99))
-    if case .finished(let minAgreement, _) = progress.last { #expect(minAgreement > 0.99) } else { Issue.record("expected finished, got \(String(describing: progress.last))") }
+    if case .finished(let minAgreement, _, _) = progress.last { #expect(minAgreement > 0.99) } else { Issue.record("expected finished, got \(String(describing: progress.last))") }
     #expect(frames.started == 1 && frames.stopped == 1)
 }
 

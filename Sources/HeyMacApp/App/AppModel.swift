@@ -23,6 +23,9 @@ final class AppModel {
     private var controller: EngineController?
 
     private(set) var setupComplete = false
+    private(set) var enrolledFacesCount = 0
+    private(set) var enrolledFaceSlots: [Int] = []
+    var isFaceListExpanded = false
     private(set) var lockScreenEnabled = false
     private(set) var paused = false
     private(set) var lockScreenNeedsPassword = false
@@ -50,6 +53,7 @@ final class AppModel {
             let sample = #"[{"bundleID":"net.whatsapp.WhatsApp","name":"\u200EWhatsApp","policy":{"everyTime":{}}},{"bundleID":"com.brave.Browser","name":"Brave Browser","policy":{"afterMinutes":{"_0":5}}},{"bundleID":"com.microsoft.Powerpoint","name":"Microsoft PowerPoint Insider Preview Edition","policy":{"afterFocusLossMinutes":{"_0":5}}},{"bundleID":"com.apple.Notes","name":"Notes","policy":{"afterMinutes":{"_0":15}}}]"#
             appLockApps = (try? JSONDecoder().decode([LockedApp].self, from: Data(sample.utf8))) ?? []
             setupComplete = true; lockScreenEnabled = true; paused = false
+            enrolledFacesCount = 1; enrolledFaceSlots = [0]
             strictness = .normal; unlocksToday = 42; launchAtLogin = true
             accessibilityTrusted = true; cameraAuthorized = true; appLockEnabled = true
             animationStyle = .minimal
@@ -89,6 +93,7 @@ final class AppModel {
     func configureSnapshot(_ scenario: String, apps: [LockedApp]) {
         precondition(Self.uiSnapshotMode)
         setupComplete = true; lockScreenEnabled = true; appLockEnabled = true
+        enrolledFacesCount = 1; enrolledFaceSlots = [0]
         paused = false; busy = false; cameraAuthorized = true; accessibilityTrusted = true
         lockScreenNeedsPassword = false; snapshotPasswordSaved = true
         startupError = nil; engineError = nil; actionError = nil; appLockApps = apps
@@ -101,12 +106,12 @@ final class AppModel {
         case "paused": paused = true
         case "camera-denied": cameraAuthorized = false
         case "accessibility-denied": accessibilityTrusted = false
-        case "no-face": setupComplete = false
+        case "no-face": setupComplete = false; enrolledFacesCount = 0; enrolledFaceSlots = []
         case "empty-apps": appLockApps = []
         case "password-rejected": lockScreenNeedsPassword = true
         case "password-missing": snapshotPasswordSaved = false
         case "engine-error": engineError = "Could not start face unlock. Review face setup."
-        case "apps-only": lockScreenEnabled = false; setupComplete = false
+        case "apps-only": lockScreenEnabled = false; setupComplete = false; enrolledFacesCount = 0; enrolledFaceSlots = []
         default: break
         }
         }
@@ -147,6 +152,10 @@ final class AppModel {
         launchAtLogin = settings.launchAtLogin
         appLockEnabled = AppLockController.shared.store.enabled
         appLockApps = AppLockController.shared.store.apps
+        if !Self.uiSnapshotMode {
+            enrolledFaceSlots = runtime?.pipeline(interactive: false, strictness: .normal).enrolledSlots() ?? []
+            enrolledFacesCount = enrolledFaceSlots.count
+        }
     }
 
     func refreshSystemState() {
@@ -406,6 +415,34 @@ final class AppModel {
         }
     }
 
+    func removeFaceData(at slot: Int) {
+        Task { @MainActor in
+            guard await authorizeChange(L10n.text("Remove face data")) else { return }
+            stopEngine()
+            do {
+                guard let runtime else { throw SecureStoreError.notFound }
+                try runtime.removeFaceData(at: slot)
+                actionError = nil
+            } catch {
+                actionError = L10n.format("Could not remove face data: %@", String(describing: error))
+            }
+            reloadSettings()
+            refreshSystemState()
+
+            if enrolledFacesCount == 0 {
+                settings.setupComplete = false
+                settings.lockScreenEnabled = false
+                settings.lockScreenNeedsPassword = false
+                reloadSettings()
+                refreshSystemState()
+                openSetup()
+            } else {
+                restartEngine()
+            }
+            log.write("removed face data at slot \(slot)")
+        }
+    }
+
     func beginFaceSetup() { busy = true; stopEngine() }
     func endFaceSetup() { busy = false; restartEngine() }
     func acceptFaceSetup() {
@@ -477,10 +514,12 @@ final class AppModel {
 
     func reEnroll() {
         Task { @MainActor in
-            guard await authorizeChange(L10n.text("Replace your face data")) else { return }
+            let actionTitle = enrolledFacesCount < 3 ? "Add Face ID" : "Replace your face data"
+            guard await authorizeChange(L10n.text(actionTitle)) else { return }
             beginFaceSetup()
             let flow = SetupFlow(model: self, startAt: .enroll)
-            windows.show(id: "setup", title: "Set Up Your Face Again", size: CGSize(width: 720, height: 620), resizable: true, minSize: CGSize(width: 640, height: 500),
+            let winTitle = enrolledFacesCount < 3 ? "Add Face ID" : "Set Up Your Face Again"
+            windows.show(id: "setup", title: winTitle, size: CGSize(width: 720, height: 620), resizable: true, minSize: CGSize(width: 640, height: 500),
                          replacing: true, onClose: { flow.teardown() }) {
                 SetupWizardView(flow: flow)
             }

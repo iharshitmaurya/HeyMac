@@ -20,7 +20,9 @@ extension AppModel {
         if !cameraAuthorized { return .init(title: "Allow camera access.", detail: "Allow camera access to use face recognition.", label: "Camera access needed", tone: .warn, action: .camera, actionTitle: "Review Camera Access…") }
         if busy { return .init(title: "Face setup is in progress.", detail: "App Lock can still use Touch ID or your Mac password.", label: "Setup in progress", tone: .idle) }
         if paused { return .init(title: "Face recognition is paused.", detail: "You can still unlock protected apps with Touch ID or your Mac password.", label: "Paused", tone: .idle, action: .resume, actionTitle: "Resume Face Recognition") }
-        return .init(title: "Your face is set up.", detail: "Face recognition was tested successfully.", label: "Ready", tone: .good)
+        let title = enrolledFacesCount > 1 ? "\(enrolledFacesCount) Face IDs Enrolled" : "Your face is set up."
+        let detail = enrolledFacesCount > 1 ? "\(enrolledFacesCount) Face IDs are set up to unlock your Mac." : "Face recognition was tested successfully."
+        return .init(title: title, detail: detail, label: "Ready", tone: .good)
     }
 
     var lockStatus: ProtectionStatus {

@@ -28,4 +28,8 @@ public enum EngineEvent: Equatable, Sendable {
 public enum StoredItems {
     public static let loginPassword = "login-password"
     public static let faceCentroid = "face-centroid"
+
+    public static func faceCentroidKey(for slot: Int) -> String {
+        slot == 0 ? faceCentroid : "\(faceCentroid)-\(slot)"
+    }
 }

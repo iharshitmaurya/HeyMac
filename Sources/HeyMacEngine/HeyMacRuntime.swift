@@ -78,13 +78,29 @@ public final class HeyMacRuntime: @unchecked Sendable {
         try interactiveStore.save(Data(password.utf8), as: StoredItems.loginPassword)
     }
 
-    /// Deletes the enrolled face, the stored password and the encryption key.
+    /// Deletes all enrolled faces, the stored password and the encryption key.
     public func removeAllData() throws {
-        try removeFile(StoredItems.faceCentroid)
+        for i in 0..<VerificationPipeline.maxEnrollmentSlots {
+            try removeFile(StoredItems.faceCentroidKey(for: i))
+        }
         try removeFile(StoredItems.loginPassword)
         try interactiveKeys.deleteKey()
         interactiveCache.clearCache()
         backgroundCache.clearCache()
+    }
+
+    /// Removes face data at a specific slot. If no enrolled faces remain, clears password and keys.
+    public func removeFaceData(at index: Int) throws {
+        let key = StoredItems.faceCentroidKey(for: index)
+        try removeFile(key)
+
+        let remaining = (try? pipeline(interactive: false, strictness: .normal).loadEnrolledCentroids()) ?? []
+        if remaining.isEmpty {
+            try removeFile(StoredItems.loginPassword)
+            try interactiveKeys.deleteKey()
+            interactiveCache.clearCache()
+            backgroundCache.clearCache()
+        }
     }
 
     private func fileExists(_ name: String) -> Bool {
@@ -112,7 +128,16 @@ public final class EnrollmentSession: @unchecked Sendable {
     }
 
     public func commit() throws {
-        try destination.save(store.load(StoredItems.faceCentroid), as: StoredItems.faceCentroid)
+        var targetKey = StoredItems.faceCentroidKey(for: 0)
+        for i in 0..<VerificationPipeline.maxEnrollmentSlots {
+            let key = StoredItems.faceCentroidKey(for: i)
+            if (try? destination.load(key)) == nil {
+                targetKey = key
+                break
+            }
+            if i == VerificationPipeline.maxEnrollmentSlots - 1 { targetKey = key }
+        }
+        try destination.save(store.load(StoredItems.faceCentroid), as: targetKey)
     }
 
     deinit { try? FileManager.default.removeItem(at: directory) }

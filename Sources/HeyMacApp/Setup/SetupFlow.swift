@@ -153,8 +153,9 @@ final class SetupFlow {
             enrollHint = "Keep looking at the camera…"; enrollHintTone = .neutral
         case .rejectedNotLive:
             enrollHint = "Face the camera in even lighting. Use your real face, without photos or screens."; enrollHintTone = .warn
-        case .finished:
+        case .finished(let minAgreement, _, _):
             enrollFinished = true
+            model.log.write(String(format: "enrolled with minimum sample agreement %.3f", minAgreement))
             enrollHint = "Samples captured. Test recognition before saving."; enrollHintTone = .good
             advanceTask?.cancel()
             advanceTask = Task { [weak self] in
