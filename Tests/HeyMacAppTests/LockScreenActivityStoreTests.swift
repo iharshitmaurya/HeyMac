@@ -45,11 +45,12 @@ struct LockScreenActivityStoreTests {
         let today = date(2026, 11, 9, calendar: calendar)
         var firstLaunch = LockScreenActivityStore(defaults: defaults, calendar: calendar)
         firstLaunch.restore(at: today)
-        firstLaunch.recordEvent("lock screen unlocked 9:41 AM")
+        firstLaunch.recordEvent(.unlocked, at: today)
+        let expected = L10n.format("Lock Screen unlocked at %@", today.formatted(date: .omitted, time: .shortened))
 
         var nextLaunch = LockScreenActivityStore(defaults: defaults, calendar: calendar)
         nextLaunch.restore(at: today)
-        #expect(nextLaunch.lastEvent == "lock screen unlocked 9:41 AM")
+        #expect(nextLaunch.lastEvent == expected)
     }
 
     private func makeDefaults() -> (UserDefaults, String) {

@@ -11,6 +11,9 @@ for path in \
     Contents/MacOS/HeyMac \
     Contents/Info.plist \
     Contents/Resources/HeyMac_HeyMacCore.bundle \
+    Contents/Resources/en.lproj/Localizable.strings \
+    Contents/Resources/en.lproj/Localizable.stringsdict \
+    Contents/Resources/en.lproj/InfoPlist.strings \
     Contents/Resources/Animations/unlockstatic.png \
     Contents/Resources/Animations/unlockanimation.mp4 \
     Contents/Resources/Animations/unsuccessfulunlockanimation.mp4 \
@@ -24,6 +27,7 @@ done
 codesign --verify --deep --strict "$APP" || fail "signature does not verify"
 [ "$(/usr/libexec/PlistBuddy -c 'Print :LSUIElement' "$APP/Contents/Info.plist")" = "true" ] || fail "LSUIElement is not set (the app would show a Dock icon)"
 /usr/libexec/PlistBuddy -c 'Print :NSCameraUsageDescription' "$APP/Contents/Info.plist" >/dev/null || fail "no camera usage description"
+/usr/libexec/PlistBuddy -c 'Print :CFBundleDevelopmentRegion' "$APP/Contents/Info.plist" | grep -qx en || fail "development region is not en"
 
 
 "$APP/Contents/MacOS/HeyMac" --self-check || fail "self-check failed"

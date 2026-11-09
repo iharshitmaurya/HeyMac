@@ -32,7 +32,7 @@ struct FormRow<Trailing: View>: View {
 
     private var labels: some View {
         VStack(alignment: .leading, spacing: Spacing.xs) {
-            Text(title).font(Typography.rowTitle)
+            Text(L10n.text(title)).font(Typography.rowTitle)
                 .lineLimit(2)
             if let caption { CaptionText(caption) }
             if let chip { chip }
@@ -69,7 +69,7 @@ struct SectionHeader: View {
     let text: String
     init(_ text: String) { self.text = text }
     var body: some View {
-        Text(text).font(Typography.sectionTitle)
+        Text(L10n.text(text)).font(Typography.sectionTitle)
             .foregroundStyle(.secondary)
             .lineLimit(1)
             .padding(.bottom, Spacing.xxs)
@@ -81,7 +81,7 @@ struct CaptionText: View {
     let text: String
     init(_ text: String) { self.text = text }
     var body: some View {
-        Text(text).font(Typography.caption)
+        Text(L10n.text(text)).font(Typography.caption)
             .foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
     }
@@ -102,7 +102,7 @@ struct SidebarItem: View {
                     .foregroundStyle(isSelected ? Theme.accent : .secondary)
                     .frame(width: 20, height: 20)
                     .accessibilityHidden(true)
-                Text(title).font(.system(size: 13, weight: isSelected ? .semibold : .regular))
+                Text(L10n.text(title)).font(.system(size: 13, weight: isSelected ? .semibold : .regular))
                     .foregroundStyle(isSelected ? Theme.accent : Color.primary)
                     .lineLimit(1).truncationMode(.tail)
                 Spacer(minLength: 0)

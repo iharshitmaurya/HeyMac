@@ -88,7 +88,7 @@ struct AppLockPane: View {
                     else { RoundedRectangle(cornerRadius: 4).fill(Color.primary.opacity(0.3)).frame(width: 65, height: 42) }
                     Image(systemName: "lock").foregroundStyle(.primary)
                 }.frame(height: 76).accessibilityHidden(true)
-                Label(mode.title, systemImage: model.shieldMode == mode ? "largecircle.fill.circle" : "circle")
+                Label(L10n.text(mode.title), systemImage: model.shieldMode == mode ? "largecircle.fill.circle" : "circle")
                     .font(Typography.rowTitle)
                 CaptionText(mode == .fullScreen ? "Cover the display until you unlock." : "Keep the rest of your desktop in view.")
             }.padding(12).frame(minWidth: 145, maxWidth: .infinity, alignment: .leading)
@@ -129,11 +129,11 @@ struct AppLockPane: View {
     }
 
     private func lockedRow(_ app: LockedApp) -> some View {
-        let policy = Picker("Relock policy for \(app.name)", selection: Binding(
+        let policy = Picker(L10n.format("Relock policy for %@", app.name), selection: Binding(
             get: { PolicyChoice(app.policy) },
             set: { model.setLockedAppPolicy($0.policy, for: app.bundleID) }
         )) {
-            ForEach(PolicyChoice.allCases) { Text($0.title).tag($0) }
+            ForEach(PolicyChoice.allCases) { Text(L10n.text($0.title)).tag($0) }
         }
         .labelsHidden().pickerStyle(.menu)
         .frame(minWidth: 220, idealWidth: 260, maxWidth: 260)
@@ -144,8 +144,8 @@ struct AppLockPane: View {
                 .frame(width: 24, height: 24).contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("Remove \(app.name) from App Lock")
-        .help("Remove \(app.name) from App Lock")
+        .accessibilityLabel(L10n.format("Remove %@ from App Lock", app.name))
+        .help(L10n.format("Remove %@ from App Lock", app.name))
 
         let name = Text(app.name).font(Typography.rowTitle)
             .lineLimit(1).truncationMode(.tail).layoutPriority(1)
@@ -252,7 +252,7 @@ private struct AppPickerSheet: View {
                         .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
-                    .accessibilityLabel("Add \(app.name) to App Lock")
+                    .accessibilityLabel(L10n.format("Add %@ to App Lock", app.name))
                 }
                 .frame(minHeight: 240, idealHeight: 320, maxHeight: .infinity)
             }

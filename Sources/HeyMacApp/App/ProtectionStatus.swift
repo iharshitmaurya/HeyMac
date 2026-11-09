@@ -35,11 +35,11 @@ extension AppModel {
     var appStatus: ProtectionStatus {
         if !appLockEnabled { return .init(title: "App Lock is off.", detail: "Selected apps aren’t protected while App Lock is off.", label: "Off", tone: .idle, action: .apps, actionTitle: "Review App Lock") }
         if appLockApps.isEmpty { return .init(title: "Choose apps to protect.", detail: "App Lock is on, but no apps are selected.", label: "No apps selected", tone: .warn, action: .addApp, actionTitle: "Add an App…") }
-        let count = "\(appLockApps.count) \(appLockApps.count == 1 ? "app" : "apps") protected"
+        let count = L10n.plural("App Lock protected apps", count: appLockApps.count)
         if !setupComplete || !cameraAuthorized || startupError != nil || engineError != nil || busy || paused {
-            return .init(title: faceStatus.title, detail: "\(count) · Touch ID or your Mac password is available. \(faceStatus.detail)", label: "Touch ID or password available", tone: paused ? .idle : .warn, action: faceStatus.action, actionTitle: faceStatus.actionTitle)
+            return .init(title: faceStatus.title, detail: L10n.format("%@ · Touch ID or your Mac password is available. %@", count, L10n.text(faceStatus.detail)), label: "Touch ID or password available", tone: paused ? .idle : .warn, action: faceStatus.action, actionTitle: faceStatus.actionTitle)
         }
-        return .init(title: "App Lock is active.", detail: "\(count) · Face recognition, Touch ID, or your Mac password.", label: "Active", tone: .good)
+        return .init(title: "App Lock is active.", detail: L10n.format("%@ · Face recognition, Touch ID, or your Mac password.", count), label: "Active", tone: .good)
     }
 
     var protectionStatus: ProtectionStatus {
@@ -47,7 +47,7 @@ extension AppModel {
         if lockScreenEnabled && lockStatus.tone == .warn { return lockStatus }
         if appLockEnabled && appStatus.tone == .warn { return appStatus }
         if paused || busy { return faceStatus }
-        return .init(title: "Hey Mac is ready.", detail: [lockScreenEnabled ? "Lock Screen face unlock is ready." : nil, appLockEnabled ? "\(appLockApps.count) \(appLockApps.count == 1 ? "app is" : "apps are") protected." : nil].compactMap { $0 }.joined(separator: " "), label: "Ready", tone: .good)
+        return .init(title: "Hey Mac is ready.", detail: [lockScreenEnabled ? "Lock Screen face unlock is ready." : nil, appLockEnabled ? L10n.plural("App Lock ready summary", count: appLockApps.count) : nil].compactMap { $0 }.joined(separator: " "), label: "Ready", tone: .good)
     }
 
     func perform(_ action: ProtectionStatus.Action) {

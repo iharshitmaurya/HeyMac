@@ -159,7 +159,7 @@ struct StatusChip: View {
     var body: some View {
         HStack(spacing: 5) {
             Circle().fill(tone.color).frame(width: 6, height: 6)
-            Text(text).lineLimit(1)
+            Text(L10n.text(text)).lineLimit(1)
         }
         .font(.system(size: 11, weight: .medium))
         .fixedSize(horizontal: true, vertical: false)

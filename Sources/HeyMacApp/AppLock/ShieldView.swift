@@ -110,11 +110,11 @@ struct ShieldContent: View {
             } else if let icon = model.icon {
                 Image(nsImage: icon).resizable().scaledToFit().frame(width: compact ? 40 : 64, height: compact ? 40 : 64).accessibilityHidden(true)
             }
-            Text(unlocked ? "Unlocked" : scanning ? "Looking for your face…" : "Unlock \(model.appName)")
+            Text(unlocked ? L10n.text("Unlocked") : scanning ? L10n.text("Looking for your face…") : L10n.format("Unlock %@", model.appName))
                 .font(.system(size: compact ? 20 : 27, weight: .semibold))
                 .multilineTextAlignment(.center).foregroundStyle(.white)
                 .accessibilityAddTraits(.isHeader)
-            Text(status).font(.system(size: 13)).foregroundStyle(.white.opacity(0.9))
+            Text(L10n.text(status)).font(.system(size: 13)).foregroundStyle(.white.opacity(0.9))
                 .multilineTextAlignment(.center).fixedSize(horizontal: false, vertical: true)
             if scanning || authenticating { ProgressView().controlSize(.small).accessibilityLabel(scanning ? "Recognizing your face" : "Waiting for authentication") }
             if !unlocked {
@@ -127,11 +127,11 @@ struct ShieldContent: View {
             if scanning {
                 Button("Stop Recognition") { model.onStopRecognition() }.buttonStyle(.plain).foregroundStyle(.white)
             }
-            Button("Close \(model.appName) Without Unlocking") { model.onQuitApp() }
+            Button(L10n.format("Close %@ Without Unlocking", model.appName)) { model.onQuitApp() }
                 .buttonStyle(.plain).foregroundStyle(.white)
                 .multilineTextAlignment(.center)
             }
-            Label("Unlock to view \(model.appName).", systemImage: "shield")
+            Label(L10n.format("Unlock to view %@.", model.appName), systemImage: "shield")
                 .font(.system(size: 12)).foregroundStyle(.white.opacity(0.75))
         }
         .frame(maxWidth: 440).padding(.vertical, Spacing.sm)

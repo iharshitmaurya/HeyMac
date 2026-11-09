@@ -81,7 +81,7 @@ struct SettingsView: View {
                 SidebarItem(title: item.rawValue, systemImage: item.icon, isSelected: selection.pane == item) {
                     selection.pane = item
                 }
-                .accessibilityLabel(item.rawValue)
+                .accessibilityLabel(L10n.text(item.rawValue))
             }
             Spacer(minLength: 0)
 
@@ -89,7 +89,7 @@ struct SettingsView: View {
                         isSelected: selection.pane == .about) {
                 selection.pane = .about
             }
-            .accessibilityLabel(SettingsPane.about.rawValue)
+            .accessibilityLabel(L10n.text(SettingsPane.about.rawValue))
         }
         .padding(Spacing.md)
         .frame(width: 220)
@@ -100,7 +100,7 @@ struct SettingsView: View {
     private var content: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: Spacing.xl) {
-                if let error = model.actionError { Label(error, systemImage: "exclamationmark.triangle").font(Typography.caption).foregroundStyle(Theme.warnText) }
+                if let error = model.actionError { Label(L10n.text(error), systemImage: "exclamationmark.triangle").font(Typography.caption).foregroundStyle(Theme.warnText) }
                 switch selection.pane {
                 case .status: StatusPane(model: model)
                 case .lockScreen: LockScreenPane(model: model)
@@ -124,10 +124,10 @@ struct PaneTitle: View {
     init(_ text: String, subtitle: String? = nil) { self.text = text; self.subtitle = subtitle }
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.xs) {
-            Text(text).font(.system(size: 27, weight: .semibold)).tracking(-0.7)
+            Text(L10n.text(text)).font(.system(size: 27, weight: .semibold)).tracking(-0.7)
                 .lineLimit(2).accessibilityAddTraits(.isHeader)
             if let subtitle {
-                Text(subtitle).font(.system(size: 13)).foregroundStyle(.secondary)
+                Text(L10n.text(subtitle)).font(.system(size: 13)).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
@@ -151,7 +151,7 @@ struct PaneSection<Content: View>: View {
 /// A switch row inside a card: the title is the VoiceOver label.
 private func switchRow(_ title: String, caption: String? = nil, chip: StatusChip? = nil, isOn: Binding<Bool>, disabled: Bool = false) -> some View {
     FormRow(title: title, caption: caption, chip: chip) {
-        Toggle(title, isOn: isOn)
+        Toggle(L10n.text(title), isOn: isOn)
             .labelsHidden().toggleStyle(.switch).tint(Theme.accent).disabled(disabled)
     }
 }
@@ -190,7 +190,7 @@ private struct StatusPane: View {
                 RowDivider()
                 HStack {
                     Spacer()
-                    Button(actionTitle) {
+                    Button(L10n.text(actionTitle)) {
                         model.perform(model.protectionStatus.action)
                     }
                     .buttonStyle(PillButtonStyle(kind: .secondary))
@@ -199,7 +199,7 @@ private struct StatusPane: View {
             }
         }
 
-        if model.lastEvent != "no checks yet" {
+        if model.lastEvent != L10n.text("No checks yet") {
             HStack(alignment: .top, spacing: Spacing.sm) {
                 Image(systemName: "clock").foregroundStyle(.secondary)
                 VStack(alignment: .leading, spacing: Spacing.xs) {
@@ -243,7 +243,7 @@ private struct StatusPane: View {
                     Text("\(model.unlocksToday)").font(.system(size: 15, weight: .semibold).monospacedDigit())
                 }
                 RowDivider()
-                FormRow(title: "Recent activity", caption: model.lastEvent == "no checks yet" ? "No unlock activity yet." : model.lastEvent) {
+                FormRow(title: "Recent activity", caption: model.lastEvent == L10n.text("No checks yet") ? "No unlock activity yet." : model.lastEvent) {
                     Button("Open Log…") { NSWorkspace.shared.open(model.log.url) }
                         .buttonStyle(PillButtonStyle(kind: .secondary))
                 }
@@ -277,8 +277,8 @@ private struct StatusPane: View {
 
     private var statusText: some View {
         VStack(alignment: .leading, spacing: Spacing.xs) {
-            Text(statusTitle).font(.system(size: 20, weight: .semibold))
-            Text(statusSubtitle).font(Typography.body).foregroundStyle(.secondary)
+            Text(L10n.text(statusTitle)).font(.system(size: 20, weight: .semibold))
+            Text(L10n.text(statusSubtitle)).font(Typography.body).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
     }
@@ -287,7 +287,7 @@ private struct StatusPane: View {
         FormRow(title: title, caption: caption, chip: StatusChip(text: status, tone: tone)) {
             Button("Manage") { selection.pane = pane }
                 .buttonStyle(PillButtonStyle(kind: .secondary))
-                .accessibilityLabel("Manage \(title)")
+                .accessibilityLabel(L10n.format("Manage %@", title))
         }
     }
 }
@@ -327,7 +327,7 @@ private struct LockScreenPane: View {
                 RowDivider()
                 HStack(alignment: .firstTextBaseline, spacing: Spacing.sm) {
                     Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(Theme.warn)
-                    Text(reason).foregroundStyle(Theme.warnText).fixedSize(horizontal: false, vertical: true)
+                    Text(L10n.text(reason)).foregroundStyle(Theme.warnText).fixedSize(horizontal: false, vertical: true)
                     Spacer(minLength: 0)
                 }
                 .font(Typography.caption)
@@ -399,7 +399,7 @@ private struct LockScreenPane: View {
             Text("Saved password").font(Typography.rowTitle)
             CaptionText(hasPassword ? "Encrypted on this Mac." : "Required for Lock Screen face unlock.")
             if hasPassword, !form.isChanging, let message = form.message {
-                Text(message).font(Typography.caption).foregroundStyle(Theme.goodText)
+                Text(L10n.text(message)).font(Typography.caption).foregroundStyle(Theme.goodText)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
@@ -434,7 +434,7 @@ private struct LockScreenPane: View {
         SecureField("Confirm password", text: Binding(get: { form.confirm }, set: { form.confirm = $0 }))
             .textFieldStyle(.roundedBorder)
         HStack(spacing: Spacing.md) {
-            Button(hasPassword ? "Update Password" : "Save Password") { Task { await save() } }
+            Button(L10n.text(hasPassword ? "Update Password" : "Save Password")) { Task { await save() } }
                 .buttonStyle(PillButtonStyle(kind: .primary))
                 .disabled(form.password.isEmpty || form.isSaving)
             if hasPassword {
@@ -442,7 +442,7 @@ private struct LockScreenPane: View {
                     .buttonStyle(PillButtonStyle(kind: .secondary))
             }
             if let message = form.message {
-                Text(message).font(Typography.caption)
+                Text(L10n.text(message)).font(Typography.caption)
                     .foregroundStyle(form.messageIsError ? Theme.badText : Theme.goodText)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -497,7 +497,7 @@ private struct FacePane: View {
                 FormRow(title: "Face setup", caption: model.setupComplete
                         ? "Verify it’s you, capture new face data, then test recognition."
                         : "Capture a few clear samples to set up face recognition.") {
-                    Button(model.setupComplete ? "Set Up Again…" : "Set Up Face Recognition…") {
+                    Button(L10n.text(model.setupComplete ? "Set Up Again…" : "Set Up Face Recognition…")) {
                         model.setupComplete ? model.reEnroll() : model.openSetup()
                     }
                     .buttonStyle(PillButtonStyle(kind: .secondary))
@@ -520,7 +520,7 @@ private struct FacePane: View {
             SettingsCard {
                 CaptionText("Applies to Lock Screen and App Lock.").frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, Spacing.lg).padding(.top, Spacing.md)
                 Picker("Face match requirement", selection: Binding(get: { model.strictness }, set: { model.setStrictness($0) })) {
-                    ForEach(MatchStrictness.allCases, id: \.self) { level in Text(matchLabel(level)).tag(level) }
+                    ForEach(MatchStrictness.allCases, id: \.self) { level in Text(L10n.text(matchLabel(level))).tag(level) }
                 }
                 .pickerStyle(.segmented).labelsHidden().padding(Spacing.lg)
             }
@@ -562,11 +562,11 @@ private struct FacePane: View {
         FaceCard(fill: Surface.card, stroke: Surface.hairline) {
             VStack(spacing: Spacing.md) {
                 FaceIconCircle(icon: "faceid", tint: Theme.good, ink: Theme.goodText)
-                Text(model.faceStatus.title).font(.system(size: 20, weight: .semibold))
+                Text(L10n.text(model.faceStatus.title)).font(.system(size: 20, weight: .semibold))
                 CaptionText(model.faceStatus.detail).multilineTextAlignment(.center)
                 StatusChip(text: model.faceStatus.label, tone: model.faceStatus.tone)
                 if let title = model.faceStatus.actionTitle {
-                    Button(title) { model.perform(model.faceStatus.action) }.buttonStyle(PillButtonStyle(kind: .secondary))
+                    Button(L10n.text(title)) { model.perform(model.faceStatus.action) }.buttonStyle(PillButtonStyle(kind: .secondary))
                 }
             }.frame(maxWidth: .infinity).padding(.vertical, Spacing.lg)
         }
@@ -575,11 +575,11 @@ private struct FacePane: View {
     /// Cancel is the default (Return) button; the destructive confirm is second and never the default.
     private func confirmRemoval() {
         let alert = NSAlert()
-        alert.messageText = "Remove your face data?"
-        alert.informativeText = "This deletes your enrolled face, the stored login password and the encryption key and turns off lock-screen face unlock. You can set Hey Mac up again afterwards."
+        alert.messageText = L10n.text("Remove your face data?")
+        alert.informativeText = L10n.text("This deletes your enrolled face, the stored login password and the encryption key and turns off lock-screen face unlock. You can set Hey Mac up again afterwards.")
         alert.alertStyle = .warning
-        alert.addButton(withTitle: "Cancel")
-        let remove = alert.addButton(withTitle: "Remove")
+        alert.addButton(withTitle: L10n.text("Cancel"))
+        let remove = alert.addButton(withTitle: L10n.text("Remove"))
         remove.hasDestructiveAction = true
         if alert.runModal() == .alertSecondButtonReturn {
             model.removeAllData()
@@ -641,7 +641,7 @@ private struct AppearancePane: View {
                         model.setAnimationStyle($0)
                         demo.replay(model, reducedMotion: reduceMotion, playNotch: false)
                     })) {
-                        ForEach(UnlockAnimationStyle.allCases) { style in Text(style.title).tag(style) }
+                        ForEach(UnlockAnimationStyle.allCases) { style in Text(L10n.text(style.title)).tag(style) }
                     }.pickerStyle(.segmented).disabled(!model.animationEnabled)
                     Button("Replay animation") { demo.replay(model, reducedMotion: reduceMotion) }
                         .buttonStyle(PillButtonStyle(kind: .secondary)).disabled(!model.animationEnabled)
@@ -668,7 +668,7 @@ private struct AboutPane: View {
                 .resizable().frame(width: 76, height: 76)
                 .clipShape(RoundedRectangle(cornerRadius: 19, style: .continuous))
                 .accessibilityHidden(true)
-            Text("Version \(version)").font(Typography.mono).foregroundStyle(.secondary)
+            Text(L10n.format("Version %@", version)).font(Typography.mono).foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, Spacing.xl)
@@ -712,11 +712,11 @@ private struct AboutPane: View {
     /// Cancel is the default (Return) button; the destructive confirm is second and never the default.
     private func confirmUninstall() {
         let alert = NSAlert()
-        alert.messageText = "Uninstall Hey Mac?"
-        alert.informativeText = "This deletes your enrolled face, the stored login password, the encryption key, your settings and the app itself, and turns off lock-screen unlock and App Lock. It can't be undone."
+        alert.messageText = L10n.text("Uninstall Hey Mac?")
+        alert.informativeText = L10n.text("This deletes your enrolled face, the stored login password, the encryption key, your settings and the app itself, and turns off lock-screen unlock and App Lock. It can't be undone.")
         alert.alertStyle = .warning
-        alert.addButton(withTitle: "Cancel")
-        let remove = alert.addButton(withTitle: "Uninstall")
+        alert.addButton(withTitle: L10n.text("Cancel"))
+        let remove = alert.addButton(withTitle: L10n.text("Uninstall"))
         remove.hasDestructiveAction = true
         if alert.runModal() == .alertSecondButtonReturn {
             Task { await model.uninstall() }
@@ -788,7 +788,7 @@ private struct FaceActionRow: View {
                 HStack(spacing: Spacing.lg) {
                     FaceIconCircle(icon: icon, tint: tint, ink: ink)
                     VStack(alignment: .leading, spacing: Spacing.xxs) {
-                        Text(title).font(Typography.sectionTitle)
+                        Text(L10n.text(title)).font(Typography.sectionTitle)
                             .foregroundStyle(tone == .danger ? Theme.badText : Color.primary)
                         CaptionText(caption)
                     }
@@ -801,8 +801,8 @@ private struct FaceActionRow: View {
         }
         .buttonStyle(PressableCardStyle())
         .opacity(isEnabled ? 1 : 0.5)
-        .accessibilityLabel(title)
-        .accessibilityHint(caption)
+        .accessibilityLabel(L10n.text(title))
+        .accessibilityHint(L10n.text(caption))
     }
 }
 

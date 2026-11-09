@@ -22,6 +22,12 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN/HeyMac" "$APP/Contents/MacOS/HeyMac"
 # SwiftPM's resource bundle holds the Core ML models; the app looks for it here.
 cp -R "$BIN/HeyMac_HeyMacCore.bundle" "$APP/Contents/Resources/"
+# App localizations live in the main bundle so SwiftUI controls and system permission
+# prompts resolve them through macOS's normal preferred-language selection.
+for LOCALE_DIR in "$PACKAGING"/*.lproj; do
+    [ -d "$LOCALE_DIR" ] || continue
+    cp -R "$LOCALE_DIR" "$APP/Contents/Resources/"
+done
 cp -R "$REPO_ROOT/Sources/HeyMacApp/Animations" "$APP/Contents/Resources/Animations"
 # Sparkle (the updater) is a framework the executable loads from Contents/Frameworks.
 SPARKLE="$(find "$REPO_ROOT/.build/artifacts/sparkle" -type d -name Sparkle.framework -path '*macos-arm64_x86_64*' | head -1)"

@@ -36,7 +36,7 @@ final class AppModel {
     private(set) var accessibilityTrusted = false
     private(set) var cameraAuthorized = false
     private(set) var busy = false
-    private(set) var lastEvent = "no checks yet"
+    private(set) var lastEvent = L10n.text("No checks yet")
     private(set) var startupError: String?
     private(set) var engineError: String?
     private(set) var unlocksToday = 0
@@ -54,14 +54,14 @@ final class AppModel {
             accessibilityTrusted = true; cameraAuthorized = true; appLockEnabled = true
             animationStyle = .minimal
             shieldMode = .fullScreen
-            lastEvent = "lock screen unlocked 9:41 AM"
+            lastEvent = L10n.format("Lock Screen unlocked at %@", "9:41 AM")
             return
         }
 
         do {
             runtime = try HeyMacRuntime()
         } catch {
-            startupError = "Face models failed to load: \(error)"
+            startupError = L10n.format("Face models failed to load: %@", String(describing: error))
             log.write(startupError ?? "")
         }
 
@@ -172,7 +172,7 @@ final class AppModel {
             try controller.start()
             self.controller = controller
         } catch {
-            engineError = "Could not start face unlock: \(error)"
+            engineError = L10n.format("Could not start face unlock: %@", String(describing: error))
             actionError = engineError
             log.write(actionError ?? "")
         }
@@ -184,26 +184,31 @@ final class AppModel {
     }
 
     func handle(_ event: EngineEvent) {
-        let time = Date().formatted(date: .omitted, time: .shortened)
         switch event {
         case .lockScreenScanning:
-            lastEvent = "lock screen scanning \(time)"
+            activityStore.recordEvent(.scanning)
+            lastEvent = activityStore.lastEvent
         case .lockScreenUnlocked:
-            lastEvent = "lock screen unlocked \(time)"
+            activityStore.recordEvent(.unlocked)
+            lastEvent = activityStore.lastEvent
             countUnlock()
         case .lockScreenPasswordRejected:
-            lastEvent = "stored password rejected \(time)"
+            activityStore.recordEvent(.passwordRejected)
+            lastEvent = activityStore.lastEvent
             lockScreenNeedsPassword = true
         case .lockScreenNoMatch:
-            lastEvent = "face not recognized \(time)"
+            activityStore.recordEvent(.noMatch)
+            lastEvent = activityStore.lastEvent
         case .lockScreenNoFace:
-            lastEvent = "no face detected \(time)"
+            activityStore.recordEvent(.noFace)
+            lastEvent = activityStore.lastEvent
         case .lockScreenScanEnded:
-            lastEvent = "lock screen scan ended \(time)"
+            activityStore.recordEvent(.scanEnded)
+            lastEvent = activityStore.lastEvent
         case .lockScreenProblem(let reason):
             lastEvent = reason
+            activityStore.recordEvent(lastEvent)
         }
-        activityStore.recordEvent(lastEvent)
         NotchOverlayController.shared.handle(event)
     }
 
@@ -223,7 +228,7 @@ final class AppModel {
     func setLockScreenEnabled(_ enabled: Bool) {
         if !enabled && lockScreenEnabled {
             Task { @MainActor in
-                guard await authorizeChange("Turn off Lock Screen face unlock") else { return }
+                guard await authorizeChange(L10n.text("Turn off Lock Screen face unlock")) else { return }
                 applyLockScreenEnabled(false)
             }
             return
@@ -368,8 +373,8 @@ final class AppModel {
     }
 
     func saveLoginPassword(_ password: String) async -> String? {
-        guard await authorizeChange("Save your Mac login password in Hey Mac") else { return "Password unchanged. Authenticate to save it." }
-        guard let runtime else { return "Face models are not loaded" }
+        guard await authorizeChange(L10n.text("Save your Mac login password in Hey Mac")) else { return L10n.text("Password unchanged. Authenticate to save it.") }
+        guard let runtime else { return L10n.text("Face models are not loaded") }
         do {
             try runtime.saveLoginPassword(password)
             settings.lockScreenNeedsPassword = false
@@ -377,13 +382,13 @@ final class AppModel {
             log.write("stored login password updated")
             return nil
         } catch {
-            return "Could not save the password: \(error)"
+            return L10n.format("Could not save the password: %@", String(describing: error))
         }
     }
 
     func removeAllData() {
         Task { @MainActor in
-            guard await authorizeChange("Remove your face data") else { return }
+            guard await authorizeChange(L10n.text("Remove your face data")) else { return }
             stopEngine()
             do {
                 guard let runtime else { throw SecureStoreError.notFound }
@@ -395,7 +400,7 @@ final class AppModel {
                 refreshSystemState()
                 log.write("face data and saved login password removed; App Lock settings retained")
             } catch {
-                actionError = "Could not remove face data: \(error)"
+                actionError = L10n.format("Could not remove face data: %@", String(describing: error))
                 restartEngine()
             }
         }
@@ -437,8 +442,8 @@ final class AppModel {
         let trashed = bundle.pathExtension == "app" && (try? FileManager.default.trashItem(at: bundle, resultingItemURL: nil)) != nil
         if !trashed && bundle.pathExtension == "app" {
             let alert = NSAlert()
-            alert.messageText = "Hey Mac's data is removed"
-            alert.informativeText = "It couldn't move itself to the Trash. Drag Hey Mac from Applications to the Trash to finish."
+            alert.messageText = L10n.text("Hey Mac's data is removed")
+            alert.informativeText = L10n.text("It couldn't move itself to the Trash. Drag Hey Mac from Applications to the Trash to finish.")
             alert.runModal()
         }
         exit(0) // no orderly quit: nothing may write settings back after they were deleted
@@ -472,7 +477,7 @@ final class AppModel {
 
     func reEnroll() {
         Task { @MainActor in
-            guard await authorizeChange("Replace your face data") else { return }
+            guard await authorizeChange(L10n.text("Replace your face data")) else { return }
             beginFaceSetup()
             let flow = SetupFlow(model: self, startAt: .enroll)
             windows.show(id: "setup", title: "Set Up Your Face Again", size: CGSize(width: 720, height: 620), resizable: true, minSize: CGSize(width: 640, height: 500),

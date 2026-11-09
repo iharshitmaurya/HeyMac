@@ -1,0 +1,2 @@
+/* Permission prompts shown by macOS are localized separately from app UI. */
+"NSCameraUsageDescription" = "Hey Mac uses the camera to recognize your face for Lock Screen unlock and App Lock. Images never leave this Mac.";

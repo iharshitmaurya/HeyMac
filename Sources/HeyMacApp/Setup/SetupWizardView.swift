@@ -111,7 +111,7 @@ struct SetupWizardView: View {
                 }
             }
             .accessibilityHidden(true)
-            Text("Step \(index + 1) of \(stepCount) · \(flow.title)")
+            Text(L10n.format("Step %ld of %ld · %@", index + 1, stepCount, flow.title))
                 .font(.system(size: 11)).foregroundStyle(WZ.text2).lineLimit(1)
         }
         .padding(.horizontal, 48)
@@ -119,7 +119,7 @@ struct SetupWizardView: View {
         .padding(.bottom, 8)
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("Step \(index + 1) of \(stepCount): \(flow.title)")
+        .accessibilityLabel(L10n.format("Step %ld of %ld: %@", index + 1, stepCount, flow.title))
     }
 
     /// Back on the left; secondary and primary actions on the right. The primary never moves.
@@ -129,7 +129,7 @@ struct SetupWizardView: View {
                 Button("Back") { flow.back() }.buttonStyle(WizardButtonStyle(kind: .secondary))
             }
             if flow.startStep == .welcome && ![.welcome, .done].contains(flow.step) && !flow.working {
-                Button([.camera, .enroll, .test].contains(flow.step) ? "Finish Setup Later" : "Skip for Now") {
+                Button(L10n.text([.camera, .enroll, .test].contains(flow.step) ? "Finish Setup Later" : "Skip for Now")) {
                     if [.camera, .enroll, .test].contains(flow.step) { flow.finishLater() } else { flow.advance() }
                 }.buttonStyle(.plain).foregroundStyle(WZ.accentText)
             }
@@ -196,21 +196,21 @@ struct SetupWizardView: View {
     }
 
     private func primary(_ title: String, action: @escaping () -> Void) -> some View {
-        Button(title, action: action).buttonStyle(WizardButtonStyle(kind: .primary)).keyboardShortcut(.defaultAction)
+        Button(L10n.text(title), action: action).buttonStyle(WizardButtonStyle(kind: .primary)).keyboardShortcut(.defaultAction)
     }
 
     private func secondary(_ title: String, action: @escaping () -> Void) -> some View {
-        Button(title, action: action).buttonStyle(WizardButtonStyle(kind: .secondary))
+        Button(L10n.text(title), action: action).buttonStyle(WizardButtonStyle(kind: .secondary))
     }
 
     // MARK: - Shared pieces
 
     private func h1(_ text: String, size: CGFloat = 22) -> some View {
-        Text(text).font(.system(size: size, weight: .semibold)).lineLimit(2).multilineTextAlignment(.center)
+        Text(L10n.text(text)).font(.system(size: size, weight: .semibold)).lineLimit(2).multilineTextAlignment(.center)
     }
 
     private func bodyText(_ text: String) -> some View {
-        Text(text).font(.system(size: 13)).foregroundStyle(WZ.text2)
+        Text(L10n.text(text)).font(.system(size: 13)).foregroundStyle(WZ.text2)
             .lineSpacing(4).multilineTextAlignment(.center)
             .frame(maxWidth: 420).fixedSize(horizontal: false, vertical: true)
     }
@@ -233,7 +233,7 @@ struct SetupWizardView: View {
     private func chip(_ text: String, icon: String, fg: Color, bg: Color) -> some View {
         HStack(spacing: 4) {
             Image(systemName: icon).font(.system(size: 9, weight: .bold))
-            Text(text).font(.system(size: 11, weight: .semibold))
+            Text(L10n.text(text)).font(.system(size: 11, weight: .semibold))
         }
         .foregroundStyle(fg)
         .padding(.horizontal, 8).frame(height: 20)
@@ -243,8 +243,8 @@ struct SetupWizardView: View {
     private func feature(_ symbol: String, _ title: String, _ caption: String) -> some View {
         VStack(spacing: 6) {
             tile(symbol, size: 36)
-            Text(title).font(.system(size: 13, weight: .semibold)).lineLimit(1)
-            Text(caption).font(.system(size: 11)).foregroundStyle(WZ.text2)
+            Text(L10n.text(title)).font(.system(size: 13, weight: .semibold)).lineLimit(1)
+            Text(L10n.text(caption)).font(.system(size: 11)).foregroundStyle(WZ.text2)
                 .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity)
@@ -297,7 +297,7 @@ struct SetupWizardView: View {
                             Image(systemName: flow.plan == plan ? "largecircle.fill.circle" : "circle")
                                 .foregroundStyle(flow.plan == plan ? Theme.accent : .secondary)
                             VStack(alignment: .leading, spacing: 4) {
-                                Text(plan.rawValue).font(Typography.rowTitle)
+                                Text(L10n.text(plan.rawValue)).font(Typography.rowTitle)
                                 CaptionText(plan.detail)
                             }
                             Spacer()
@@ -332,23 +332,23 @@ struct SetupWizardView: View {
         VStack(spacing: 8) {
             Text("Set up face recognition").font(.system(size: 17, weight: .semibold))
             enrollRing
-            Text(enrollHeadline).font(.system(size: 13, weight: .medium))
+            Text(L10n.text(enrollHeadline)).font(.system(size: 13, weight: .medium))
                 .foregroundStyle(hintColor).multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
-            Text(enrollSubline).font(.system(size: 11)).foregroundStyle(WZ.text2)
+            Text(L10n.text(enrollSubline)).font(.system(size: 11)).foregroundStyle(WZ.text2)
                 .multilineTextAlignment(.center)
         }
     }
 
     private var enrollHeadline: String {
-        if flow.enrollFinished { return "All set. That’s all \(flow.sampleTarget) samples." }
+        if flow.enrollFinished { return L10n.plural("Setup enrollment complete", count: flow.sampleTarget) }
         return flow.enrollHint.isEmpty ? "Hold still and look straight at the camera." : flow.enrollHint
     }
 
     private var enrollSubline: String {
         if flow.enrollFinished { return "Test recognition to save your face setup. Your existing data stays unchanged until the test succeeds." }
-        if flow.enrolling { return "Sample \(min(flow.samplesCaptured + 1, flow.sampleTarget)) of \(flow.sampleTarget). Turn your head slowly." }
-        return "We’ll take \(flow.sampleTarget) quick samples in good, even light."
+        if flow.enrolling { return L10n.plural("Setup enrollment sample progress", count: min(flow.samplesCaptured + 1, flow.sampleTarget), total: flow.sampleTarget) }
+        return L10n.plural("Setup enrollment samples instruction", count: flow.sampleTarget)
     }
 
     private var hintColor: Color {
@@ -383,7 +383,7 @@ struct SetupWizardView: View {
         .animation(.easeOut(duration: 0.3), value: flow.enrollFinished)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Enrollment progress")
-        .accessibilityValue("\(flow.samplesCaptured) of \(flow.sampleTarget) samples")
+        .accessibilityValue(L10n.format("%ld of %ld samples", flow.samplesCaptured, flow.sampleTarget))
     }
 
     private var test: some View {
@@ -397,9 +397,9 @@ struct SetupWizardView: View {
             }
             .frame(width: 190, height: 190)
             .animation(.easeOut(duration: 0.3), value: flow.testPassed)
-            Text(testHeadline).font(.system(size: 13, weight: .medium))
+            Text(L10n.text(testHeadline)).font(.system(size: 13, weight: .medium))
                 .foregroundStyle(testColor).multilineTextAlignment(.center)
-            Text(testSubline).font(.system(size: 11)).foregroundStyle(WZ.text2)
+            Text(L10n.text(testSubline)).font(.system(size: 11)).foregroundStyle(WZ.text2)
                 .multilineTextAlignment(.center).frame(maxWidth: 340)
                 .fixedSize(horizontal: false, vertical: true)
         }
@@ -456,8 +456,8 @@ struct SetupWizardView: View {
 
     private func passwordField(_ label: String, text: Binding<String>) -> some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(label).font(Typography.caption).foregroundStyle(WZ.text2)
-            SecureField(label, text: text).labelsHidden().textFieldStyle(.roundedBorder).accessibilityLabel(label)
+            Text(L10n.text(label)).font(Typography.caption).foregroundStyle(WZ.text2)
+            SecureField(L10n.text(label), text: text).labelsHidden().textFieldStyle(.roundedBorder).accessibilityLabel(L10n.text(label))
         }
     }
 
@@ -477,11 +477,11 @@ struct SetupWizardView: View {
                     Image(nsImage: NSWorkspace.shared.icon(forFile: app.url.path)).resizable().frame(width: 30, height: 30).accessibilityHidden(true)
                     Text(app.name).font(Typography.body).lineLimit(2)
                     Spacer()
-                    Button(selected ? "Deselect" : "Select") {
+                    Button(L10n.text(selected ? "Deselect" : "Select")) {
                         if selected { flow.model.removeLockedApp(app.bundleID) } else { flow.model.addLockedApp(app) }
                     }
                         .buttonStyle(WizardButtonStyle(kind: .secondary))
-                        .accessibilityLabel(selected ? "\(app.name) selected" : "Select \(app.name)")
+                        .accessibilityLabel(selected ? L10n.format("%@ selected", app.name) : L10n.format("Select %@", app.name))
                 }.padding(12).background(WZ.card, in: RoundedRectangle(cornerRadius: 10))
             }
         }
@@ -490,12 +490,12 @@ struct SetupWizardView: View {
     private func readinessRow(_ title: String, _ value: String, ready: Bool) -> some View {
         ViewThatFits(in: .horizontal) {
             HStack(spacing: Spacing.md) {
-                Text(title).font(Typography.body).layoutPriority(1)
+                Text(L10n.text(title)).font(Typography.body).layoutPriority(1)
                 Spacer(minLength: Spacing.sm)
                 StatusChip(text: value, tone: ready ? .good : .warn)
             }
             VStack(alignment: .leading, spacing: Spacing.xs) {
-                Text(title).font(Typography.body)
+                Text(L10n.text(title)).font(Typography.body)
                 StatusChip(text: value, tone: ready ? .good : .warn)
             }
         }
@@ -518,7 +518,7 @@ struct SetupWizardView: View {
                 }
                 if flow.startStep == .welcome && flow.wantsAppLock {
                     Divider()
-                    readinessRow("App Lock", flow.model.appLockApps.isEmpty ? "No apps selected" : "\(flow.model.appLockApps.count) apps selected", ready: !flow.model.appLockApps.isEmpty)
+                    readinessRow("App Lock", flow.model.appLockApps.isEmpty ? "No apps selected" : L10n.plural("Setup App Lock selected apps", count: flow.model.appLockApps.count), ready: !flow.model.appLockApps.isEmpty)
                 }
             }.background(WZ.card, in: RoundedRectangle(cornerRadius: 12))
             bodyText(flow.startStep == .welcome ? "Ready features turn on when you open Settings. App Lock can also use Touch ID or your Mac password." : "Your updated face setup is saved. Your protection settings stay as you chose them.")

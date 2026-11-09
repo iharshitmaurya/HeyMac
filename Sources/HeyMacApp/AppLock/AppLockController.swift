@@ -130,7 +130,7 @@ final class AppLockController {
                 self.shield.model.phase = .authenticating
                 NotchOverlayController.shared.cancelScanning()
             })
-            let outcome = await coordinator.run(reason: "Unlock \(name)")
+            let outcome = await coordinator.run(reason: L10n.format("Unlock %@", name))
             guard !Task.isCancelled, attemptID == attempt, activeApp?.processIdentifier == app.processIdentifier else { return }
             await finish(app, outcome, attempt: attempt)
         }

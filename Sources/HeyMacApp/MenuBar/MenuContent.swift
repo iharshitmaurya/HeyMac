@@ -27,7 +27,7 @@ struct MenuContent: View {
                     ForEach(problems, id: \.self) { problem in
                         HStack(alignment: .firstTextBaseline, spacing: Spacing.sm) {
                             Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(Theme.warn)
-                            Text(problem).foregroundStyle(Theme.warnText).fixedSize(horizontal: false, vertical: true)
+                            Text(L10n.text(problem)).foregroundStyle(Theme.warnText).fixedSize(horizontal: false, vertical: true)
                             Spacer(minLength: 0)
                         }
                         .font(Typography.caption)
@@ -76,7 +76,7 @@ struct MenuContent: View {
                 HStack(spacing: 5) {
                     Circle().fill(statusTint).frame(width: 6, height: 6)
                         .accessibilityHidden(true)
-                    Text(statusTitle).font(Typography.caption)
+                    Text(L10n.text(statusTitle)).font(Typography.caption)
                         .foregroundStyle(.secondary)
                 }
             }
@@ -90,7 +90,7 @@ struct MenuContent: View {
     private var statusTint: Color { model.protectionStatus.tone == .warn ? Theme.warnText : model.protectionStatus.tone == .good ? Theme.goodText : .secondary }
     private var statusTitle: String { previewPaused == true ? "Face recognition is paused." : previewProblems?.isEmpty == false ? "Needs attention" : model.protectionStatus.title }
     private var lockScreenStatus: String { previewPaused == true ? "Face recognition paused" : model.lockStatus.label }
-    private var appLockStatus: String { model.appStatus.tone == .good ? "\(model.appLockApps.count) apps protected" : model.appStatus.label }
+    private var appLockStatus: String { model.appStatus.tone == .good ? L10n.plural("App Lock protected apps", count: model.appLockApps.count) : model.appStatus.label }
 
     private func iconView(_ name: String, tint: Color? = nil) -> some View {
         Image(systemName: name)
@@ -105,18 +105,18 @@ struct MenuContent: View {
             HStack(spacing: Spacing.md) {
                 iconView(icon)
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(label).font(Typography.body).lineLimit(1)
-                    Text(caption).font(Typography.caption).foregroundStyle(.secondary)
+                    Text(L10n.text(label)).font(Typography.body).lineLimit(1)
+                    Text(L10n.text(caption)).font(Typography.caption).foregroundStyle(.secondary)
                         .lineLimit(2).fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer(minLength: Spacing.sm)
-                Toggle(label, isOn: Binding(get: { isOn }, set: action))
+                Toggle(L10n.text(label), isOn: Binding(get: { isOn }, set: action))
                     .labelsHidden()
                     .toggleStyle(.switch)
                     .controlSize(.small)
                     .tint(Theme.accent)
-                    .accessibilityLabel(label)
-                    .accessibilityValue("\(isOn ? "On" : "Off"), \(caption)")
+                    .accessibilityLabel(L10n.text(label))
+                    .accessibilityValue(L10n.format("%@, %@", L10n.text(isOn ? "On" : "Off"), L10n.text(caption)))
             }
             .padding(.horizontal, Spacing.md)
             .padding(.vertical, Spacing.sm)
@@ -129,7 +129,7 @@ struct MenuContent: View {
             HoverRow(id: label) {
                 HStack(spacing: Spacing.md) {
                     iconView(icon, tint: iconTint)
-                    Text(label).font(Typography.body).lineLimit(1).truncationMode(.tail)
+                    Text(L10n.text(label)).font(Typography.body).lineLimit(1).truncationMode(.tail)
                     Spacer(minLength: Spacing.sm)
                     if let shortcut {
                         Text(shortcut).font(Typography.caption).foregroundStyle(.secondary)
