@@ -40,7 +40,7 @@ final class AppModel {
     private(set) var startupError: String?
     private(set) var engineError: String?
     private(set) var unlocksToday = 0
-    private var unlocksTodayKey = "" // yyyy-MM-dd; a new day resets the count
+    private var activityStore = LockScreenActivityStore()
     var actionError: String?
     private(set) var snapshotPasswordSaved = true
 
@@ -65,6 +65,7 @@ final class AppModel {
             log.write(startupError ?? "")
         }
 
+        restoreActivity()
         reloadSettings()
         refreshSystemState()
         applyLaunchAtLogin()
@@ -149,6 +150,8 @@ final class AppModel {
     }
 
     func refreshSystemState() {
+        activityStore.refreshDay()
+        unlocksToday = activityStore.unlocksToday
         accessibilityTrusted = AXIsProcessTrusted()
         cameraAuthorized = AVCaptureDevice.authorizationStatus(for: .video) == .authorized
         lockScreenNeedsPassword = settings.lockScreenNeedsPassword
@@ -200,16 +203,19 @@ final class AppModel {
         case .lockScreenProblem(let reason):
             lastEvent = reason
         }
+        activityStore.recordEvent(lastEvent)
         NotchOverlayController.shared.handle(event)
     }
 
+    private func restoreActivity() {
+        activityStore.restore()
+        unlocksToday = activityStore.unlocksToday
+        lastEvent = activityStore.lastEvent
+    }
+
     private func countUnlock() {
-        let today = Date().formatted(.iso8601.year().month().day())
-        if unlocksTodayKey != today {
-            unlocksTodayKey = today
-            unlocksToday = 0
-        }
-        unlocksToday += 1
+        activityStore.recordUnlock()
+        unlocksToday = activityStore.unlocksToday
     }
 
     // MARK: - Actions
