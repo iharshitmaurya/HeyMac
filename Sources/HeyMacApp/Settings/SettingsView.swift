@@ -482,37 +482,56 @@ private struct FacePane: View {
     let model: AppModel
 
     var body: some View {
-        PaneTitle("Your Face", subtitle: "Use the same face setup for Lock Screen and App Lock.")
+        PaneTitle("Your Face", subtitle: "Manage the face data used for unlocking your Mac.")
 
         statusCard
 
-        PaneSection(header: "Face recognition") {
-            SettingsCard {
-                FormRow(title: "Test face recognition", caption: "Check your lighting, then see if Hey Mac recognizes you.") {
-                    Button("Test Face Recognition…") { model.openTest() }
-                        .buttonStyle(PillButtonStyle(kind: .secondary))
-                        .disabled(!model.setupComplete)
+        VStack(spacing: Spacing.md) {
+            FaceActionRow(
+                icon: "faceid", title: "Test Face Recognition…",
+                caption: "Check if your face is recognized correctly.", tone: .neutral
+            ) { model.openTest() }
+            .disabled(!model.setupComplete)
+
+            if model.enrolledFacesCount < 3 {
+                FaceActionRow(
+                    icon: "person.badge.plus",
+                    title: "Add Face ID (\(model.enrolledFacesCount)/3)…",
+                    caption: "Enroll another face to unlock your Mac.", tone: .neutral
+                ) { model.reEnroll() }
+                .disabled(!model.setupComplete)
+            } else {
+                FaceActionRow(
+                    icon: "person.badge.plus", title: "Add Face ID (3/3)",
+                    caption: "Maximum of 3 Face IDs reached.", tone: .neutral
+                ) {}.disabled(true)
+            }
+
+            if model.enrolledFacesCount > 0 {
+                FaceActionRow(
+                    icon: "list.bullet.rectangle.portrait", title: "Manage Enrolled Faces",
+                    caption: "View and remove specific Face IDs.", tone: .neutral,
+                    isExpanded: model.isFaceListExpanded
+                ) {
+                    withAnimation { model.isFaceListExpanded.toggle() }
                 }
-                RowDivider()
-                FormRow(title: "Face setup", caption: model.setupComplete
-                        ? "Verify it’s you, capture new face data, then test recognition."
-                        : "Capture a few clear samples to set up face recognition.") {
-                    Button(L10n.text(model.setupComplete ? "Set Up Again…" : "Set Up Face Recognition…")) {
-                        model.setupComplete ? model.reEnroll() : model.openSetup()
+
+                if model.isFaceListExpanded {
+                    ForEach(model.enrolledFaceSlots, id: \.self) { slot in
+                        FaceActionRow(
+                            icon: "person.crop.circle.badge.minus",
+                            title: "Remove Face ID \(slot + 1)…",
+                            caption: "Removes this specific face data.", tone: .danger
+                        ) { confirmRemoval(slot: slot) }
                     }
-                    .buttonStyle(PillButtonStyle(kind: .secondary))
                 }
-                RowDivider()
-                FormRow(title: "Camera access", caption: model.cameraAuthorized
-                        ? "Available for face recognition."
-                        : "Allow camera access to use face recognition.") {
-                    if model.cameraAuthorized {
-                        StatusChip(text: "Allowed", tone: .good)
-                    } else {
-                        Button("Review Camera Access…") { model.openSystemSettings(anchor: "Privacy_Camera") }
-                            .buttonStyle(PillButtonStyle(kind: .secondary))
-                    }
-                }
+            }
+
+            if !model.cameraAuthorized {
+                FaceActionRow(
+                    icon: "camera.badge.ellipsis", title: "Review Camera Access…",
+                    caption: "Camera access is required for face recognition.", tone: .prompt
+                ) { model.openSystemSettings(anchor: "Privacy_Camera") }
             }
         }
 
@@ -533,11 +552,11 @@ private struct FacePane: View {
         .padding(.horizontal, Spacing.xs)
 
         if model.setupComplete {
-            Button("Remove Face Data…") { confirmRemoval() }
+            Button("Remove All Face Data…") { confirmRemovalAll() }
                 .buttonStyle(.plain)
                 .font(.system(size: 12.5, weight: .medium))
                 .foregroundStyle(Theme.badText)
-                .accessibilityHint("Removes your face data and turns off Lock Screen face unlock.")
+                .accessibilityHint("Removes all face data and turns off Lock Screen face unlock.")
         }
     }
 
@@ -557,29 +576,48 @@ private struct FacePane: View {
         }
     }
 
-    /// Enrolled: a teal confirmation. Not enrolled: a direct setup action.
+    /// Enrolled: a confirmation card. Not enrolled: a direct setup action.
     @ViewBuilder private var statusCard: some View {
-        FaceCard(fill: Surface.card, stroke: Surface.hairline) {
-            VStack(spacing: Spacing.md) {
-                FaceIconCircle(icon: "faceid", tint: Theme.good, ink: Theme.goodText)
-                Text(L10n.text(model.faceStatus.title)).font(.system(size: 20, weight: .semibold))
-                CaptionText(model.faceStatus.detail).multilineTextAlignment(.center)
-                StatusChip(text: model.faceStatus.label, tone: model.faceStatus.tone)
-                if let title = model.faceStatus.actionTitle {
-                    Button(L10n.text(title)) { model.perform(model.faceStatus.action) }.buttonStyle(PillButtonStyle(kind: .secondary))
+        if model.setupComplete {
+            FaceCard(fill: Theme.good.opacity(0.12), stroke: Theme.good.opacity(0.35)) {
+                HStack(spacing: Spacing.lg) {
+                    FaceIconCircle(icon: "checkmark.shield.fill", tint: Theme.good, ink: Theme.goodText)
+                    VStack(alignment: .leading, spacing: Spacing.xxs) {
+                        Text(model.enrolledFacesCount > 1 ? "\(model.enrolledFacesCount) Face IDs Enrolled" : "1 Face ID Enrolled")
+                            .font(Typography.sectionTitle)
+                        CaptionText("Your face data is securely stored on this Mac.")
+                    }
+                    Spacer(minLength: 0)
                 }
-            }.frame(maxWidth: .infinity).padding(.vertical, Spacing.lg)
+            }
+        } else {
+            FaceActionRow(
+                icon: "person.crop.circle.badge.plus", title: "Not enrolled",
+                caption: "Set up Hey Mac to enroll your face.", tone: .prompt
+            ) { model.openSetup() }
         }
     }
 
-    /// Cancel is the default (Return) button; the destructive confirm is second and never the default.
-    private func confirmRemoval() {
+    private func confirmRemoval(slot: Int) {
         let alert = NSAlert()
-        alert.messageText = L10n.text("Remove your face data?")
-        alert.informativeText = L10n.text("This deletes your enrolled face, the stored login password and the encryption key and turns off lock-screen face unlock. You can set Hey Mac up again afterwards.")
+        alert.messageText = L10n.format("Remove Face ID %d?", slot + 1)
+        alert.informativeText = L10n.text("This removes this enrolled face. Your other enrolled faces will stay active.")
         alert.alertStyle = .warning
         alert.addButton(withTitle: L10n.text("Cancel"))
         let remove = alert.addButton(withTitle: L10n.text("Remove"))
+        remove.hasDestructiveAction = true
+        if alert.runModal() == .alertSecondButtonReturn {
+            model.removeFaceData(at: slot)
+        }
+    }
+
+    private func confirmRemovalAll() {
+        let alert = NSAlert()
+        alert.messageText = L10n.text("Remove all face data?")
+        alert.informativeText = L10n.text("This deletes all enrolled faces, the stored login password and the encryption key and turns off lock-screen face unlock. You can set Hey Mac up again afterwards.")
+        alert.alertStyle = .warning
+        alert.addButton(withTitle: L10n.text("Cancel"))
+        let remove = alert.addButton(withTitle: L10n.text("Remove All"))
         remove.hasDestructiveAction = true
         if alert.runModal() == .alertSecondButtonReturn {
             model.removeAllData()
@@ -761,7 +799,8 @@ private struct FaceActionRow: View {
     let icon: String
     let title: String
     let caption: String
-    let tone: Tone
+    var tone: Tone = .neutral
+    var isExpanded: Bool? = nil
     let action: () -> Void
 
     @Environment(\.isEnabled) private var isEnabled
@@ -793,8 +832,13 @@ private struct FaceActionRow: View {
                         CaptionText(caption)
                     }
                     Spacer(minLength: Spacing.sm)
-                    Image(systemName: "chevron.right").font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(.secondary).accessibilityHidden(true)
+                    if let isExpanded {
+                        Image(systemName: isExpanded ? "chevron.down" : "chevron.right").font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(.secondary).accessibilityHidden(true)
+                    } else {
+                        Image(systemName: "chevron.right").font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(.secondary).accessibilityHidden(true)
+                    }
                 }
             }
             .contentShape(Rectangle())

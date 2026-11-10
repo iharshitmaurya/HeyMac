@@ -50,6 +50,12 @@ public final class VerificationPipeline {
         self.config = config
     }
 
+    public static let maxEnrollmentSlots = 3
+
+    public static func centroidKey(for slot: Int) -> String {
+        slot == 0 ? centroidKey : "\(centroidKey)-\(slot)"
+    }
+
     /// One enrollment sample: the frame must contain a face that passes liveness, so a
     /// photo can't be enrolled.
     public func enrollmentSample(from image: CGImage) throws -> (embedding: FaceEmbedding, liveness: LivenessResult) {
@@ -59,14 +65,38 @@ public final class VerificationPipeline {
         return (try embedder.embedding(for: face, in: frame), liveness)
     }
 
-    /// Saves the normalized centroid of `embeddings` as the enrolled identity.
+    /// Saves the normalized centroid of `embeddings` into the first available slot (0..<maxEnrollmentSlots),
+    /// defaulting to the last slot if all are occupied.
     @discardableResult
-    public func saveEnrollment(_ embeddings: [FaceEmbedding]) throws -> FaceEmbedding {
+    public func saveEnrollment(_ embeddings: [FaceEmbedding]) throws -> (embedding: FaceEmbedding, slot: Int) {
         guard !embeddings.isEmpty else { throw VerificationPipelineError.noImagesProvided }
         let centroid = EmbeddingMath.normalized(EmbeddingMath.centroid(of: embeddings.map(EmbeddingMath.normalized)))
         let data = centroid.vector.withUnsafeBufferPointer { Data(buffer: $0) }
-        try store.save(data, as: Self.centroidKey)
-        return centroid
+
+        var indexToSave = 0
+        for i in 0..<Self.maxEnrollmentSlots {
+            let key = Self.centroidKey(for: i)
+            if (try? store.load(key)) == nil {
+                indexToSave = i
+                break
+            }
+            if i == Self.maxEnrollmentSlots - 1 { indexToSave = i }
+        }
+
+        let key = Self.centroidKey(for: indexToSave)
+        try store.save(data, as: key)
+        return (centroid, indexToSave)
+    }
+
+    public func enrolledSlots() -> [Int] {
+        var slots: [Int] = []
+        for i in 0..<Self.maxEnrollmentSlots {
+            let key = Self.centroidKey(for: i)
+            if let stored = try? store.load(key), !stored.isEmpty {
+                slots.append(i)
+            }
+        }
+        return slots
     }
 
     public func enroll(images: [CGImage]) throws {
@@ -74,29 +104,63 @@ public final class VerificationPipeline {
         try saveEnrollment(images.map { try enrollmentSample(from: $0).embedding })
     }
 
-    public func loadEnrolledCentroid() throws -> FaceEmbedding {
-        let stored = try store.load(Self.centroidKey)
-        guard !stored.isEmpty, stored.count % MemoryLayout<Float>.size == 0 else {
+    public func loadEnrolledCentroids() throws -> [FaceEmbedding] {
+        var centroids: [FaceEmbedding] = []
+        var notFoundCount = 0
+        for i in 0..<Self.maxEnrollmentSlots {
+            let key = Self.centroidKey(for: i)
+            do {
+                let stored = try store.load(key)
+                if !stored.isEmpty, stored.count % MemoryLayout<Float>.size == 0 {
+                    let centroid = stored.withUnsafeBytes { FaceEmbedding(vector: Array($0.bindMemory(to: Float.self))) }
+                    centroids.append(centroid)
+                }
+            } catch SecureStoreError.notFound {
+                notFoundCount += 1
+            } catch {
+            }
+        }
+
+        if centroids.isEmpty {
+            if notFoundCount == Self.maxEnrollmentSlots {
+                throw SecureStoreError.notFound
+            }
             throw VerificationPipelineError.corruptEnrollment
         }
-        return stored.withUnsafeBytes { FaceEmbedding(vector: Array($0.bindMemory(to: Float.self))) }
+        return centroids
     }
 
-    public func evaluate(image: CGImage, against centroid: FaceEmbedding) throws -> FrameEvaluation {
+    public func loadEnrolledCentroid() throws -> FaceEmbedding {
+        guard let first = try loadEnrolledCentroids().first else {
+            throw VerificationPipelineError.corruptEnrollment
+        }
+        return first
+    }
+
+    public func evaluate(image: CGImage, against centroids: [FaceEmbedding]) throws -> FrameEvaluation {
+        guard !centroids.isEmpty else { throw VerificationPipelineError.corruptEnrollment }
         let (face, frame) = try detect(in: image)
         let liveness = try classifier.liveness(for: face, in: frame)
         let candidate = try embedder.embedding(for: face, in: frame)
-        // The centroid comes from disk; a dimension mismatch (corrupt file, other build)
-        // must fail closed rather than trip cosineSimilarity's precondition.
-        let similarity = candidate.vector.count == centroid.vector.count ? EmbeddingMath.cosineSimilarity(centroid, candidate) : -1
+
+        var bestSimilarity: Float = -1
+        for centroid in centroids {
+            let similarity = candidate.vector.count == centroid.vector.count ? EmbeddingMath.cosineSimilarity(centroid, candidate) : -1
+            bestSimilarity = max(bestSimilarity, similarity)
+        }
+
         return FrameEvaluation(
-            liveness: liveness.confidence, similarity: similarity,
-            isLive: isLive(liveness), isMatch: similarity >= config.matchThreshold
+            liveness: liveness.confidence, similarity: bestSimilarity,
+            isLive: isLive(liveness), isMatch: bestSimilarity >= config.matchThreshold
         )
     }
 
+    public func evaluate(image: CGImage, against centroid: FaceEmbedding) throws -> FrameEvaluation {
+        try evaluate(image: image, against: [centroid])
+    }
+
     public func verify(image: CGImage) throws -> Bool {
-        try evaluate(image: image, against: loadEnrolledCentroid()).accepted
+        try evaluate(image: image, against: loadEnrolledCentroids()).accepted
     }
 
     private func isLive(_ result: LivenessResult) -> Bool {

@@ -328,9 +328,19 @@ struct SetupWizardView: View {
         }
     }
 
+    private var enrollTitle: String {
+        let count = flow.model.enrolledFacesCount
+        if count > 0 && count < 3 {
+            return "Add Face ID (\(count + 1)/3)"
+        } else if count >= 3 {
+            return "Replace Face ID (3/3)"
+        }
+        return "Set up face recognition"
+    }
+
     private var enroll: some View {
         VStack(spacing: 8) {
-            Text("Set up face recognition").font(.system(size: 17, weight: .semibold))
+            Text(L10n.text(enrollTitle)).font(.system(size: 17, weight: .semibold))
             enrollRing
             Text(L10n.text(enrollHeadline)).font(.system(size: 13, weight: .medium))
                 .foregroundStyle(hintColor).multilineTextAlignment(.center)

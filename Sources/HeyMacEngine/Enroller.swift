@@ -5,7 +5,7 @@ import HeyMacCore
 public protocol EnrollmentSampling: AnyObject {
     func enrollmentSample(from image: CGImage) throws -> (embedding: FaceEmbedding, liveness: LivenessResult)
     @discardableResult
-    func saveEnrollment(_ embeddings: [FaceEmbedding]) throws -> FaceEmbedding
+    func saveEnrollment(_ embeddings: [FaceEmbedding]) throws -> (embedding: FaceEmbedding, slot: Int)
 }
 
 extension VerificationPipeline: EnrollmentSampling {}
@@ -13,7 +13,7 @@ extension VerificationPipeline: EnrollmentSampling {}
 public enum EnrollmentProgress: Equatable, Sendable {
     case sampleCaptured(count: Int, target: Int, liveness: Float)
     case rejectedNotLive(confidence: Float)
-    case finished(minAgreement: Float, meanAgreement: Float)
+    case finished(minAgreement: Float, meanAgreement: Float, slot: Int)
     case failed(String)
 }
 
@@ -103,11 +103,13 @@ public final class Enroller {
             return false
         }
         do {
-            let centroid = try sampler.saveEnrollment(samples)
+            let result = try sampler.saveEnrollment(samples)
+            let centroid = result.embedding
             let agreement = samples.map { EmbeddingMath.cosineSimilarity(centroid, $0) }
             onProgress(.finished(
                 minAgreement: agreement.min() ?? 0,
-                meanAgreement: agreement.reduce(0, +) / Float(agreement.count)
+                meanAgreement: agreement.reduce(0, +) / Float(agreement.count),
+                slot: result.slot
             ))
             return true
         } catch {
