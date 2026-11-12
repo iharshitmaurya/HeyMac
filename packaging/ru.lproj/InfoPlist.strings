@@ -1,0 +1,2 @@
+/* Permission prompts shown by macOS are localized separately from app UI. */
+"NSCameraUsageDescription" = "Hey Mac использует камеру для разблокировки с помощью функции распознавания вашего лица при блокировке экрана и блокировке приложений. Изображения никогда не покидают этот Mac.";
